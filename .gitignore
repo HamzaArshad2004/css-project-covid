@@ -1,0 +1,31 @@
+# ---- credentials & secrets ----
+.env
+*.key
+secrets.json
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+.eggs/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# ---- virtual environment ----
+venv/
+.venv/
+env/
+
+# ---- macOS ----
+.DS_Store
+
+# ---- data (large raw files) ----
+# Processed outputs are checked in; raw source data is not.
+data/raw/*.csv
+data/raw/*.json
+
+# ---- IDE ----
+.vscode/
+.idea/

@@ -1,0 +1,54 @@
+premise,conclusion,support,support_pct,confidence,lift,leverage,cross_domain
+"severe_lockdown_behavior, compliance_discussed",lockdown_mentioned,35,5.216095380029806,94.28571428571428,2.9563417890520696,0.032544792677699275,True
+"mobility_drop_workplace, compliance_discussed",lockdown_mentioned,40,5.961251862891207,92.5,2.90035046728972,0.03612953951328289,True
+"severe_lockdown_behavior, policy_governance_discussion",lockdown_mentioned,34,5.067064083457526,88.23529411764706,2.7666300164925786,0.028549154785992393,True
+"mobility_drop_workplace, policy_governance_discussion",lockdown_mentioned,39,5.812220566318927,84.61538461538461,2.6531272465851905,0.030643588655853198,True
+"severe_lockdown_behavior, solidarity_messages",lockdown_mentioned,55,8.19672131147541,81.81818181818183,2.565420560747664,0.040922528157142514,True
+"severe_lockdown_behavior, health_concern",lockdown_mentioned,59,8.79284649776453,81.35593220338984,2.5509266592745132,0.04349226303246484,True
+"grocery_spike, high_positive_sentiment",low_emotion_low_mobility_signal,103,15.350223546944857,85.43689320388349,2.155193809767136,0.07029568608811726,True
+"vaccine_mentioned, low_emotion_low_mobility_signal",grocery_spike,159,23.69597615499255,88.0503144654088,2.0657958393807454,0.10764457257335515,True
+"high_positive_sentiment, low_emotion_low_mobility_signal",grocery_spike,101,15.052160953800298,87.12871287128714,2.0441736481340445,0.06699078937724465,True
+"sentiment_worsened, low_emotion_low_mobility_signal",grocery_spike,64,9.538002980625931,85.9375,2.0162259615384617,0.04131342991864357,True
+"compliance_discussed, low_emotion_low_mobility_signal",grocery_spike,76,11.326378539493295,85.52631578947368,2.0065789473684212,0.04859397522660087,True
+"grocery_spike, policy_governance_discussion",vaccine_mentioned,67,9.985096870342772,88.05970149253731,1.9565582682613423,0.0429880886014379,True
+"dominant_emotion_fear, low_emotion_low_mobility_signal",grocery_spike,222,33.084947839046194,83.33333333333334,1.9551282051282053,0.13469008819720993,True
+"sentiment_shift_detected, low_emotion_low_mobility_signal",grocery_spike,145,21.609538002980628,82.75862068965517,1.9416445623342176,0.08673132833304831,True
+"lockdown_mentioned, low_emotion_low_mobility_signal",grocery_spike,62,9.239940387481372,82.25806451612904,1.9299007444168736,0.03662260878063082,True
+"grocery_spike, lockdown_mentioned",vaccine_mentioned,69,10.283159463487332,85.5072463768116,1.8998464343986947,0.0416465848290138,True
+"covid_topic_detected, low_emotion_low_mobility_signal",grocery_spike,205,30.55141579731744,80.97560975609757,1.8998123827392122,0.11717280300994357,True
+"solidarity_messages, low_emotion_low_mobility_signal",grocery_spike,99,14.754098360655737,80.8080808080808,1.895881895881896,0.05633871637634068,True
+"sentiment_improved, low_emotion_low_mobility_signal",grocery_spike,81,12.071535022354695,80.24691358024691,1.8827160493827162,0.04541789841440473,True
+"severe_lockdown_behavior, policy_governance_discussion",solidarity_messages,34,5.067064083457526,82.35294117647058,1.8731804586241276,0.01945180470014948,True
+"grocery_spike, compliance_discussed",vaccine_mentioned,89,13.263785394932937,80.89887640449437,1.7974551677952229,0.0476056156591692,True
+"mobility_drop_workplace, policy_governance_discussion",health_concern,39,5.812220566318927,92.3076923076923,1.584103875663978,0.019782738577783898,True
+"severe_lockdown_behavior, policy_governance_discussion",health_concern,34,5.067064083457526,91.17647058823529,1.5646908379720175,0.01667329274766181,True
+"residential_increase, policy_governance_discussion",health_concern,82,12.220566318926975,89.02439024390245,1.527758717484873,0.03758209492249706,True
+"mobility_drop_retail, policy_governance_discussion",health_concern,49,7.302533532041728,87.75510204081633,1.505976303564904,0.02153069134085968,True
+"mobility_drop_transit, policy_governance_discussion",health_concern,105,15.648286140089418,84.76190476190476,1.4546096699549385,0.04145335498099907,True
+"mobility_drop_workplace, solidarity_messages",health_concern,59,8.79284649776453,84.7457627118644,1.454332654211279,0.023278644103935445,True
+"severe_lockdown_behavior, solidarity_messages",health_concern,55,8.19672131147541,83.63636363636363,1.4352941176470586,0.020791087439837777,True
+"partial_restrictions, policy_governance_discussion",health_concern,71,10.581222056631892,81.69014084507043,1.401894744425633,0.024780062233337265,True
+"high_negative_sentiment, sentiment_shift_detected",sentiment_worsened,39,5.812220566318927,94.87179487179486,3.350472334682861,0.0386837271594546,False
+high_negative_sentiment,sentiment_worsened,41,6.110283159463488,90.2439024390244,3.1870346598202826,0.03783973471985004,False
+"high_negative_sentiment, covid_topic_detected",sentiment_worsened,40,5.961251862891207,90.0,3.178421052631579,0.03677141797392952,False
+"high_negative_sentiment, dominant_emotion_fear",sentiment_worsened,37,5.514157973174367,89.1891891891892,3.149786628733997,0.03356646773616796,False
+"high_positive_sentiment, sentiment_shift_detected",sentiment_improved,179,26.67660208643815,82.68156424581005,2.746501465789037,0.1402582172658643,False
+"grocery_spike, weekend",low_emotion_low_mobility_signal,82,12.220566318926975,87.8048780487805,2.214927562809463,0.05885736749873957,False
+low_emotion_low_mobility_signal,grocery_spike,266,39.642324888226526,83.83458646616542,1.9668883747831118,0.16337250494735042,False
+"weekend, low_emotion_low_mobility_signal",grocery_spike,87,12.965722801788376,82.75862068965517,1.9416445623342176,0.05203879699982899,False
+"lockdown_mentioned, low_emotion_low_mobility_signal",vaccine_mentioned,62,9.239940387481372,87.09677419354838,1.9351634266182438,0.038890283203884136,False
+"policy_governance_discussion, low_emotion_low_mobility_signal",vaccine_mentioned,65,9.687034277198212,83.07692307692308,1.8458481915435558,0.036878027545247986,False
+"compliance_discussed, low_emotion_low_mobility_signal",vaccine_mentioned,76,11.326378539493295,80.26315789473685,1.7833304287208087,0.039931947556975045,False
+high_negative_sentiment,sentiment_shift_detected,41,6.110283159463488,95.1219512195122,1.6282354405176704,0.022425767533387674,False
+"high_negative_sentiment, covid_topic_detected",sentiment_shift_detected,40,5.961251862891207,95.0,1.6261479591836734,0.02180609940009906,False
+"high_negative_sentiment, dominant_emotion_fear",sentiment_shift_detected,37,5.514157973174367,94.5945945945946,1.6192084942084943,0.019947095000233207,False
+"compliance_discussed, policy_governance_discussion",health_concern,92,13.710879284649776,90.21739130434783,1.548231958189703,0.04380098658274123,False
+"fear_keywords_present, solidarity_messages",health_concern,36,5.365126676602086,86.11111111111111,1.4777635691957942,0.014936445148265039,False
+"policy_governance_discussion, solidarity_messages",health_concern,113,16.84053651266766,85.84070796460178,1.473123146911708,0.04642846830919439,False
+"solidarity_messages, emotion_with_mobility_signal",health_concern,35,5.216095380029806,82.85714285714286,1.421921812203142,0.012824243016517824,False
+"sentiment_improved, policy_governance_discussion",health_concern,63,9.38897168405365,82.53968253968253,1.416473835911176,0.02278557483658751,False
+"compliance_discussed, solidarity_messages",health_concern,130,19.374068554396423,82.3076923076923,1.4124926224670469,0.04656839337154989,False
+"lockdown_mentioned, policy_governance_discussion",health_concern,90,13.412816691505217,82.22222222222221,1.4110258596192098,0.03212501749063279,False
+"covid_topic_detected, policy_governance_discussion",health_concern,180,26.825633383010434,81.66666666666667,1.4014919011082694,0.06275972201554278,False
+"sentiment_shift_detected, policy_governance_discussion",health_concern,110,16.39344262295082,80.9090909090909,1.3884910485933504,0.03711123598250715,False
+policy_governance_discussion,health_concern,182,27.123695976154995,80.76923076923077,1.3860908912059806,0.06102287441614601,False

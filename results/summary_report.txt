@@ -1,0 +1,228 @@
+================================================================================
+CRISIS BEHAVIORAL ANALYSIS - SUMMARY REPORT
+UAE COVID-19 ANALYSIS
+================================================================================
+
+DATA OVERVIEW:
+--------------------------------------------------------------------------------
+Analysis Period: 2020-03-01 to 2021-12-31
+Total Days Analyzed: 671
+Binary Features: 29
+
+FEATURE ACTIVATION SUMMARY:
+--------------------------------------------------------------------------------
+  anger_mentioned                                 2.2%
+  anxiety_keywords_present                        4.2%
+  compliance_discussed                           33.2%
+  covid_topic_detected                           84.9%
+  dominant_emotion_fear                          84.9%
+  emotion_mobility_mismatch                       5.8%
+  emotion_with_mobility_signal                    8.9%
+  fear_keywords_present                           7.9%
+  grocery_spike                                  42.6%
+  health_concern                                 58.3%
+  high_negative_sentiment                         6.1%
+  high_positive_sentiment                        38.5%
+  lockdown_mentioned                             31.9%
+  low_emotion_low_mobility_signal                39.6%
+  mixed_emotions                                  3.1%
+  mobility_drop_retail                           21.0%
+  mobility_drop_transit                          54.1%
+  mobility_drop_workplace                        15.9%
+  partial_restrictions                           41.6%
+  policy_governance_discussion                   27.1%
+  residential_increase                           43.1%
+  sadness_keywords_present                        4.6%
+  sentiment_improved                             30.1%
+  sentiment_shift_detected                       58.4%
+  sentiment_worsened                             28.3%
+  severe_lockdown_behavior                       13.0%
+  solidarity_messages                            44.0%
+  vaccine_mentioned                              45.0%
+  weekend                                        28.5%
+
+
+TOP 18 ASSOCIATION RULES (LLM-SELECTED — most novel & policy-relevant):
+--------------------------------------------------------------------------------
+
+Rule 1: [CROSS-DOMAIN]
+  IF:   grocery_spike, high_positive_sentiment
+  THEN: low_emotion_low_mobility_signal
+  Support: 103 days (15.4%)
+  Confidence: 85.4%
+  Lift: 2.16
+  LLM: novelty=8/10  policy_relevance=9/10
+  Why it matters: This rule indicates that a spike in grocery shopping correlates with high positive sentiment, suggesting that positive emotions can lead to increased mobility in retail spaces.
+  Policy recommendation: Encourage positive messaging and community engagement during times of high grocery demand to maintain public morale and compliance.
+
+Rule 2: [CROSS-DOMAIN]
+  IF:   dominant_emotion_fear, low_emotion_low_mobility_signal
+  THEN: grocery_spike
+  Support: 222 days (33.1%)
+  Confidence: 83.3%
+  Lift: 1.96
+  LLM: novelty=7/10  policy_relevance=8/10
+  Why it matters: The presence of fear as a dominant emotion alongside low mobility signals suggests that fear can lead to increased grocery shopping, indicating a coping mechanism.
+  Policy recommendation: Monitor sentiment trends and provide reassurance to mitigate fear, potentially stabilizing grocery supply and demand.
+
+Rule 3: [CROSS-DOMAIN]
+  IF:   sentiment_shift_detected, low_emotion_low_mobility_signal
+  THEN: grocery_spike
+  Support: 145 days (21.6%)
+  Confidence: 82.8%
+  Lift: 1.94
+  LLM: novelty=7/10  policy_relevance=8/10
+  Why it matters: Sentiment shifts detected alongside low mobility signals predict grocery spikes, indicating that emotional changes can drive consumer behavior.
+  Policy recommendation: Implement timely communication strategies to address public sentiment shifts, potentially influencing shopping behaviors positively.
+
+Rule 4:
+  IF:   grocery_spike, weekend
+  THEN: low_emotion_low_mobility_signal
+  Support: 82 days (12.2%)
+  Confidence: 87.8%
+  Lift: 2.21
+  LLM: novelty=6/10  policy_relevance=7/10
+  Why it matters: This rule shows that grocery spikes during weekends correlate with low mobility signals, suggesting that weekend behaviors are influenced by emotional states.
+  Policy recommendation: Plan for increased grocery supply and staffing during weekends to accommodate potential spikes in shopping behavior.
+
+Rule 5: [CROSS-DOMAIN]
+  IF:   compliance_discussed, low_emotion_low_mobility_signal
+  THEN: grocery_spike
+  Support: 76 days (11.3%)
+  Confidence: 85.5%
+  Lift: 2.01
+  LLM: novelty=6/10  policy_relevance=7/10
+  Why it matters: The correlation between compliance discussions and grocery spikes indicates that discussions around compliance can lead to increased shopping activity.
+  Policy recommendation: Leverage compliance discussions to promote responsible shopping behaviors and ensure adequate supply in grocery stores.
+
+Rule 6: [CROSS-DOMAIN]
+  IF:   mobility_drop_workplace, compliance_discussed
+  THEN: lockdown_mentioned
+  Support: 40 days (6.0%)
+  Confidence: 92.5%
+  Lift: 2.90
+  LLM: novelty=5/10  policy_relevance=6/10
+  Why it matters: Mobility drops in workplaces alongside compliance discussions predict lockdown mentions, suggesting that workplace mobility is a precursor to policy changes.
+  Policy recommendation: Monitor workplace mobility closely to anticipate the need for potential lockdown measures and communicate proactively.
+
+Rule 7: [CROSS-DOMAIN]
+  IF:   mobility_drop_workplace, policy_governance_discussion
+  THEN: health_concern
+  Support: 39 days (5.8%)
+  Confidence: 92.3%
+  Lift: 1.58
+  LLM: novelty=5/10  policy_relevance=6/10
+  Why it matters: This rule indicates that mobility drops in workplaces can predict health concerns, highlighting the impact of workplace dynamics on public health perceptions.
+  Policy recommendation: Address workplace health concerns through targeted interventions when mobility drops are observed.
+
+Rule 8: [CROSS-DOMAIN]
+  IF:   grocery_spike, lockdown_mentioned
+  THEN: vaccine_mentioned
+  Support: 69 days (10.3%)
+  Confidence: 85.5%
+  Lift: 1.90
+  LLM: novelty=5/10  policy_relevance=6/10
+  Why it matters: The relationship between grocery spikes and lockdown mentions suggests that increased grocery shopping may signal public anticipation of stricter measures.
+  Policy recommendation: Prepare for potential lockdowns by ensuring grocery supply chains are robust during periods of increased shopping activity.
+
+Rule 9: [CROSS-DOMAIN]
+  IF:   grocery_spike, compliance_discussed
+  THEN: vaccine_mentioned
+  Support: 89 days (13.3%)
+  Confidence: 80.9%
+  Lift: 1.80
+  LLM: novelty=5/10  policy_relevance=6/10
+  Why it matters: Compliance discussions alongside grocery spikes indicate that public discourse can influence shopping behaviors, reflecting societal readiness for compliance.
+  Policy recommendation: Enhance public discussions around compliance to foster responsible shopping behaviors and manage supply effectively.
+
+Rule 10: [CROSS-DOMAIN]
+  IF:   severe_lockdown_behavior, policy_governance_discussion
+  THEN: solidarity_messages
+  Support: 34 days (5.1%)
+  Confidence: 82.4%
+  Lift: 1.87
+  LLM: novelty=4/10  policy_relevance=5/10
+  Why it matters: The link between severe lockdown behavior and solidarity messages predicting solidarity indicates that emotional responses can influence compliance.
+  Policy recommendation: Promote solidarity messages to enhance community support during severe lockdowns, fostering compliance and cooperation.
+
+Rule 11: [CROSS-DOMAIN]
+  IF:   severe_lockdown_behavior, solidarity_messages
+  THEN: lockdown_mentioned
+  Support: 55 days (8.2%)
+  Confidence: 81.8%
+  Lift: 2.57
+  LLM: novelty=4/10  policy_relevance=5/10
+  Why it matters: Severe lockdown behavior combined with solidarity messages suggests that emotional support can influence public compliance during crises.
+  Policy recommendation: Encourage community solidarity initiatives to bolster compliance during lockdowns.
+
+Rule 12: [CROSS-DOMAIN]
+  IF:   mobility_drop_workplace, policy_governance_discussion
+  THEN: lockdown_mentioned
+  Support: 39 days (5.8%)
+  Confidence: 84.6%
+  Lift: 2.65
+  LLM: novelty=4/10  policy_relevance=5/10
+  Why it matters: Mobility drops in workplaces alongside policy governance discussions predict lockdown mentions, indicating that workplace dynamics influence policy decisions.
+  Policy recommendation: Engage with workplace leaders to assess mobility trends and inform policy discussions proactively.
+
+Rule 13: [CROSS-DOMAIN]
+  IF:   severe_lockdown_behavior, policy_governance_discussion
+  THEN: lockdown_mentioned
+  Support: 34 days (5.1%)
+  Confidence: 88.2%
+  Lift: 2.77
+  LLM: novelty=4/10  policy_relevance=5/10
+  Why it matters: Severe lockdown behavior and policy governance discussions leading to lockdown mentions highlight the role of governance in shaping public behavior.
+  Policy recommendation: Strengthen governance communication to clarify the rationale behind lockdown measures and enhance public understanding.
+
+Rule 14: [CROSS-DOMAIN]
+  IF:   grocery_spike, policy_governance_discussion
+  THEN: vaccine_mentioned
+  Support: 67 days (10.0%)
+  Confidence: 88.1%
+  Lift: 1.96
+  LLM: novelty=3/10  policy_relevance=4/10
+  Why it matters: Grocery spikes combined with policy governance discussions predict vaccine mentions, suggesting that shopping behavior may reflect public health priorities.
+  Policy recommendation: Utilize grocery shopping trends to inform public health messaging around vaccination efforts.
+
+Rule 15: [CROSS-DOMAIN]
+  IF:   high_positive_sentiment, low_emotion_low_mobility_signal
+  THEN: grocery_spike
+  Support: 101 days (15.1%)
+  Confidence: 87.1%
+  Lift: 2.04
+  LLM: novelty=3/10  policy_relevance=4/10
+  Why it matters: High positive sentiment alongside low mobility signals predicts grocery spikes, indicating that emotional well-being can drive consumer behavior.
+  Policy recommendation: Foster positive community sentiment to encourage responsible shopping behaviors during low mobility periods.
+
+Rule 16: [CROSS-DOMAIN]
+  IF:   severe_lockdown_behavior, health_concern
+  THEN: lockdown_mentioned
+  Support: 59 days (8.8%)
+  Confidence: 81.4%
+  Lift: 2.55
+  LLM: novelty=3/10  policy_relevance=4/10
+  Why it matters: Severe lockdown behavior combined with health concerns suggests that emotional responses can influence public health perceptions.
+  Policy recommendation: Address health concerns through targeted messaging during periods of severe lockdown behavior.
+
+Rule 17: [CROSS-DOMAIN]
+  IF:   vaccine_mentioned, low_emotion_low_mobility_signal
+  THEN: grocery_spike
+  Support: 159 days (23.7%)
+  Confidence: 88.1%
+  Lift: 2.07
+  LLM: novelty=3/10  policy_relevance=4/10
+  Why it matters: Vaccine mentions following low mobility signals indicate that public health messaging can influence consumer behavior.
+  Policy recommendation: Enhance vaccine promotion during periods of low mobility to encourage public participation in vaccination efforts.
+
+Rule 18: [CROSS-DOMAIN]
+  IF:   lockdown_mentioned, low_emotion_low_mobility_signal
+  THEN: grocery_spike
+  Support: 62 days (9.2%)
+  Confidence: 82.3%
+  Lift: 1.93
+  LLM: novelty=3/10  policy_relevance=4/10
+  Why it matters: Lockdown mentions leading to grocery spikes suggest that public anticipation of restrictions can drive consumer behavior.
+  Policy recommendation: Prepare grocery supply chains for anticipated spikes in demand during discussions of potential lockdowns.
+
+================================================================================
