@@ -121,6 +121,19 @@ Generates six charts and a `summary_report.txt`:
 
 ---
 
+## UAE Policy Timeline (4 Phases)
+
+All charts use background shading to mark these phases:
+
+| Phase | Dates | Policy Context |
+|-------|-------|----------------|
+| 1 — First lockdown | Mar 1 – May 31 2020 | National lockdown; curfews; schools/businesses closed; grocery demand spikes |
+| 2 — Reopening | Jun 1 – Dec 31 2020 | Phased reopening; mask mandates continue; mobility gradually recovers |
+| 3 — Vaccine rollout | Jan 1 – Aug 31 2021 | Mass vaccination campaign; restrictions eased in stages; sentiment improves |
+| 4 — Endemic transition | Sep 1 – Dec 31 2021 | Near-full reopening; focus shifts from crisis to endemic management |
+
+---
+
 ## Key Findings
 
 ### Same-Day Rules (top cross-domain, LLM novelty ≥ 7/10, backtest-stable)
