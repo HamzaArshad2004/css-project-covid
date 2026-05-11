@@ -74,9 +74,11 @@ TAUTOLOGY_DEFINITIONS: dict[str, list[set[str]]] = {
     "sentiment_shift_detected": [
         {"sentiment_improved", "sentiment_worsened"},
     ],
-    # low_emotion_low_mobility_signal = NOT(negative emotion) AND NOT(mobility drop signal).
+    # calm_mobile_baseline = NOT(negative emotion) AND NOT(mobility disruption).
+    # Represents days of routine activity and calm public sentiment — a
+    # positive behavioural-state indicator, not a residual catch-all.
     # Cannot hold when any mobility drop feature is in the premise.
-    "low_emotion_low_mobility_signal": [
+    "calm_mobile_baseline": [
         {"mobility_drop_retail", "mobility_drop_transit", "mobility_drop_workplace",
          "severe_lockdown_behavior", "partial_restrictions",
          "emotion_with_mobility_signal"},
@@ -365,24 +367,92 @@ if __name__ == "__main__":
 
     # ------------------------------------------------------------------
     # Association rule mining — always run on the full daily matrix
+    # Thresholds tightened: support>=12%, lift>=1.8, conviction added.
     # ------------------------------------------------------------------
     daily_analyzer = FCAAnalyzer(DEFAULT_BINARY_MATRIX)
     rules_df = daily_analyzer.extract_implications(
-        min_support=0.05,
+        min_support=0.12,
         max_premise_size=2,
-        min_confidence=0.8,
-        min_lift=1.05,
+        min_confidence=0.75,
+        min_lift=1.8,
         max_conclusion_prevalence=0.75,
     )
+
+    # Compute conviction for every rule
+    if not rules_df.empty:
+        feature_prevalence = {
+            col: float(daily_analyzer.binary_data[col].mean())
+            for col in daily_analyzer.binary_data.columns
+        }
+
+        def _conviction(row) -> float:
+            conf = float(row["confidence"]) / 100.0
+            p_c = feature_prevalence.get(str(row["conclusion"]).strip(), 0.5)
+            if conf >= 1.0:
+                return float("inf")
+            if p_c >= 1.0:
+                return 1.0
+            return (1.0 - p_c) / (1.0 - conf)
+
+        rules_df["conviction"] = rules_df.apply(_conviction, axis=1)
     if not rules_df.empty:
         rules_df = rules_df.sort_values(
             ['cross_domain', 'lift', 'confidence', 'support'],
             ascending=[False, False, False, False],
         )
+    print(f"Mined {len(rules_df)} rules at tightened thresholds "
+          f"(support>=12%, confidence>=75%, lift>=1.8)")
     rules_df.to_csv(RESULTS_DIR / 'association_rules.csv', index=False)
-    print(f"Mined {len(rules_df)} association rules from {len(daily_analyzer.binary_data)} daily objects")
+    print(f"Association rules saved to {RESULTS_DIR / 'association_rules.csv'}")
+    print(f"Daily objects: {len(daily_analyzer.binary_data)}")
     print("\nTop 10 Association Rules:")
     print(rules_df.head(10))
+
+    # ------------------------------------------------------------------
+    # Also mine from the predictive (lagged/lead) matrix if it exists.
+    # This produces rules like: IF fear_lag3 THEN grocery_spike_lead2
+    # ------------------------------------------------------------------
+    predictive_matrix = PROJECT_ROOT / "data" / "processed" / "fca_predictive_matrix.csv"
+    if predictive_matrix.exists():
+        print("\nMining predictive rules from lagged/lead matrix ...")
+        pred_analyzer = FCAAnalyzer(predictive_matrix)
+        pred_rules = pred_analyzer.extract_implications(
+            min_support=0.10,      # slightly looser: fewer rows after NaN trim
+            max_premise_size=2,
+            min_confidence=0.75,
+            min_lift=1.8,
+            max_conclusion_prevalence=0.80,
+        )
+        if not pred_rules.empty:
+            pred_rules.to_csv(RESULTS_DIR / 'association_rules_predictive.csv', index=False)
+            print(f"  Mined {len(pred_rules)} predictive rules → "
+                  f"{RESULTS_DIR / 'association_rules_predictive.csv'}")
+
+            # Prune predictive rules immediately — 3k+ raw rules are too many for the LLM
+            try:
+                import sys as _sys
+                if str(PROJECT_ROOT) not in _sys.path:
+                    _sys.path.insert(0, str(PROJECT_ROOT))
+                from src.rules.prune_rules import prune_rules, build_prevalence_map  # noqa: PLC0415
+                pred_bm = pd.read_csv(DEFAULT_BINARY_MATRIX)
+                prev_map = build_prevalence_map(pred_bm)
+                print(f"  Pruning {len(pred_rules)} predictive rules ...")
+                pred_pruned = prune_rules(
+                    pred_rules,
+                    prevalence_map=prev_map,
+                    min_support_pct=10.0,
+                    min_confidence=75.0,
+                    min_lift=1.8,
+                    min_conviction=1.1,
+                    max_rules_per_consequent=3,
+                )
+                pred_pruned.to_csv(RESULTS_DIR / 'association_rules_predictive_pruned.csv', index=False)
+                print(f"  Pruned to {len(pred_pruned)} predictive rules → "
+                      f"{RESULTS_DIR / 'association_rules_predictive_pruned.csv'}")
+            except ImportError:
+                print("  NOTE: src.rules.prune_rules not importable; skipping predictive rule pruning.")
+    else:
+        print("\nPredictive matrix not found; run 'python -m src.features.lagged_features' first.")
 
     # ------------------------------------------------------------------
     # Formal context / lattice — use weekly aggregation when the daily

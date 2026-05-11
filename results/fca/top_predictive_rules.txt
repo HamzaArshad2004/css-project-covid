@@ -1,0 +1,96 @@
+========================================================================
+  TOP PREDICTIVE RULES — TEMPORAL FORECASTING SIGNALS
+  UAE COVID-19 PERIOD (March 2020 – December 2021)
+  LLM-EVALUATED with lead-time and policy recommendations
+========================================================================
+
+Predictive Rule 1:
+  IF:   grocery_spike, lockdown_mentioned
+  THEN: vaccine_mentioned_lag7
+  Support: 68 days (10.4%)  Confidence: 85.3%  Lift: 1.90
+  LLM: novelty=9/10  policy_relevance=8/10
+  Lead time: 7 days
+  Why it matters: This rule emerges during Phase 3, where vaccine rollout is critical. The non-obvious direction is that a grocery spike and lockdown mention today can forecast vaccine discussions a week later, indicating public sentiment shifts towards vaccination.
+  Policy recommendation: The UAE's MoHAP should monitor grocery spikes and lockdown discussions as triggers to anticipate increased vaccine discourse, enabling proactive outreach and vaccination campaigns.
+
+Predictive Rule 2:
+  IF:   grocery_spike, high_positive_sentiment_lag1
+  THEN: calm_mobile_baseline
+  Support: 105 days (16.0%)  Confidence: 81.0%  Lift: 2.09
+  LLM: novelty=8/10  policy_relevance=8/10
+  Lead time: 7 days
+  Why it matters: In Phase 3, the relationship between high positive sentiment and grocery spikes today predicting calm mobility in a week is insightful. It suggests that positive public sentiment can lead to reduced mobility concerns.
+  Policy recommendation: NCEMA should track high positive sentiment alongside grocery spikes to anticipate shifts in mobility, allowing for timely adjustments in public health messaging.
+
+Predictive Rule 3:
+  IF:   grocery_spike, policy_governance_discussion_lag7
+  THEN: calm_mobile_baseline
+  Support: 72 days (11.0%)  Confidence: 83.3%  Lift: 2.16
+  LLM: novelty=8/10  policy_relevance=7/10
+  Lead time: 7 days
+  Why it matters: This rule indicates that discussions about policy governance today can lead to a calm mobile baseline in a week, particularly relevant in Phase 4. It highlights the importance of governance discourse in stabilizing public behavior.
+  Policy recommendation: DHA should monitor policy governance discussions to predict and manage public mobility patterns, ensuring timely interventions if mobility spikes are anticipated.
+
+Predictive Rule 4:
+  IF:   high_positive_sentiment, calm_mobile_baseline
+  THEN: grocery_spike_lead2
+  Support: 98 days (14.9%)  Confidence: 88.8%  Lift: 2.08
+  LLM: novelty=7/10  policy_relevance=7/10
+  Lead time: 2 days
+  Why it matters: During Phase 4, the rule shows that high positive sentiment and calm mobility today can predict grocery spikes in two days. This feedback loop is crucial for understanding consumer behavior.
+  Policy recommendation: MoHAP should observe high positive sentiment and calm mobility as indicators to prepare for potential increases in grocery demand, facilitating supply chain management.
+
+Predictive Rule 5:
+  IF:   lockdown_mentioned, lockdown_mentioned_lag3
+  THEN: residential_increase_lead2
+  Support: 79 days (12.0%)  Confidence: 79.7%  Lift: 1.81
+  LLM: novelty=7/10  policy_relevance=6/10
+  Lead time: 2 days
+  Why it matters: This rule captures the essence of Phase 2, where lockdown mentions can forecast residential increases in two days. It highlights the potential for immediate public response to policy discussions.
+  Policy recommendation: NCEMA should monitor lockdown mentions to anticipate residential mobility changes, allowing for timely public health responses to emerging trends.
+
+Predictive Rule 6:
+  IF:   grocery_spike
+  THEN: grocery_spike_lead7
+  Support: 279 days (42.5%)  Confidence: 95.0%  Lift: 2.18
+  LLM: novelty=6/10  policy_relevance=6/10
+  Lead time: 7 days
+  Why it matters: This rule indicates that a grocery spike today can predict another grocery spike in a week, which is relevant during Phase 2 when compliance fatigue is setting in. It shows the persistence of consumer behavior.
+  Policy recommendation: DHA should keep track of grocery spikes as a signal for ongoing consumer behavior, preparing for sustained demand in retail sectors.
+
+Predictive Rule 7:
+  IF:   grocery_spike, sentiment_improved_lag1
+  THEN: grocery_spike_lead7
+  Support: 79 days (12.0%)  Confidence: 100.0%  Lift: 2.30
+  LLM: novelty=6/10  policy_relevance=5/10
+  Lead time: 7 days
+  Why it matters: The rule suggests that an improvement in sentiment today can lead to a grocery spike in a week, which is significant during Phase 3. It indicates the potential for sentiment to drive consumer behavior.
+  Policy recommendation: MoHAP should monitor sentiment improvements to anticipate shifts in grocery demand, enabling better resource allocation in retail.
+
+Predictive Rule 8:
+  IF:   calm_mobile_baseline, high_positive_sentiment_lag1
+  THEN: grocery_spike
+  Support: 96 days (14.6%)  Confidence: 88.5%  Lift: 2.09
+  LLM: novelty=5/10  policy_relevance=5/10
+  Lead time: 7 days
+  Why it matters: This rule shows that calm mobility and high positive sentiment today can predict grocery spikes in a week, relevant in Phase 4. It reflects the interconnectedness of sentiment and mobility.
+  Policy recommendation: NCEMA should observe calm mobility and sentiment levels to forecast grocery demand, allowing for proactive supply chain management.
+
+Predictive Rule 9:
+  IF:   sentiment_shift_detected, high_positive_sentiment_lag1
+  THEN: sentiment_worsened
+  Support: 159 days (24.2%)  Confidence: 86.2%  Lift: 3.00
+  LLM: novelty=5/10  policy_relevance=4/10
+  Lead time: 0 days
+  Why it matters: This rule indicates that a sentiment shift detected today can lead to sentiment worsening immediately, which is expected but highlights the importance of monitoring sentiment dynamics.
+  Policy recommendation: DHA should continuously monitor sentiment shifts to manage public health messaging effectively, ensuring timely responses to emerging concerns.
+
+Predictive Rule 10:
+  IF:   sentiment_shift_detected, sentiment_improved_lag1
+  THEN: sentiment_worsened
+  Support: 129 days (19.6%)  Confidence: 80.6%  Lift: 2.80
+  LLM: novelty=4/10  policy_relevance=4/10
+  Lead time: 0 days
+  Why it matters: This rule shows that a sentiment shift detected today can lead to sentiment worsening immediately, which is a common pattern but emphasizes the need for vigilance in sentiment monitoring.
+  Policy recommendation: MoHAP should track sentiment shifts closely to prepare for potential public health implications, ensuring that interventions are timely and effective.
+

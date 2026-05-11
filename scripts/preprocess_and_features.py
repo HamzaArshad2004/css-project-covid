@@ -251,7 +251,14 @@ def main() -> None:
 
     combined["emotion_with_mobility_signal"] = (emotional_signal & mobility_signal).astype(int)
     combined["emotion_mobility_mismatch"] = (emotional_signal & (~mobility_signal)).astype(int)
-    combined["low_emotion_low_mobility_signal"] = ((~emotional_signal) & (~mobility_signal)).astype(int)
+    # calm_mobile_baseline: days where NEITHER elevated negative emotion NOR any
+    # mobility-disruption signal is present.  Operationally, these are "routine"
+    # or recovery days — the public is going about normal activities without
+    # detectable crisis stress in online discourse.  Distinct from mere absence
+    # of lockdown: it requires simultaneously calm sentiment AND unimpaired
+    # mobility, making it a genuine positive behavioural-state indicator rather
+    # than a residual catch-all.
+    combined["calm_mobile_baseline"] = ((~emotional_signal) & (~mobility_signal)).astype(int)
 
     REDDIT_FEATURES_OUT.parent.mkdir(parents=True, exist_ok=True)
     if not social_df.empty:

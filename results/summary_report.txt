@@ -13,6 +13,7 @@ FEATURE ACTIVATION SUMMARY:
 --------------------------------------------------------------------------------
   anger_mentioned                                 2.2%
   anxiety_keywords_present                        4.2%
+  calm_mobile_baseline                           39.6%
   compliance_discussed                           33.2%
   covid_topic_detected                           84.9%
   dominant_emotion_fear                          84.9%
@@ -24,7 +25,6 @@ FEATURE ACTIVATION SUMMARY:
   high_negative_sentiment                         6.1%
   high_positive_sentiment                        38.5%
   lockdown_mentioned                             31.9%
-  low_emotion_low_mobility_signal                39.6%
   mixed_emotions                                  3.1%
   mobility_drop_retail                           21.0%
   mobility_drop_transit                          54.1%
@@ -42,187 +42,238 @@ FEATURE ACTIVATION SUMMARY:
   weekend                                        28.5%
 
 
-TOP 18 ASSOCIATION RULES (LLM-SELECTED — most novel & policy-relevant):
+RULE PIPELINE QUALITY SUMMARY:
+--------------------------------------------------------------------------------
+  Raw rules mined (support>=12%, lift>=1.8):   23
+  After pruning & subsumption removal:         9
+  After LLM selection:                         9
+  After temporal backtest (stable only):       8
+  Predictive (lagged/lead) rules (pruned):     40
+
+
+TEMPORAL BACKTEST (70/30 chronological split):
+--------------------------------------------------------------------------------
+  Rules tested:  9
+  Stable rules:  8  (88%)
+  Unstable rules: 1  (confidence drop > 10pp on holdout)
+    DROPPED: grocery_spike, weekend → calm_mobile_baseline  (drop=12.2pp)
+
+
+TOP 8 ASSOCIATION RULES (BACKTEST-STABLE + LLM-EVALUATED):
 --------------------------------------------------------------------------------
 
 Rule 1: [CROSS-DOMAIN]
+  IF:   health_concern, calm_mobile_baseline
+  THEN: grocery_spike
+  Support: 137 days (20.4%)
+  Confidence: 77.4%
+  Lift: 1.82
+  Conviction: 2.536
+  Leverage: 0.071
+  Composite Score: 0.375
+  Temporal Validity: 0.500
+  LLM: novelty=8/10  policy_relevance=7/10
+  Why it matters: This rule relates to Phase 3, where health concerns co-occur with grocery spikes. The direction is non-obvious as one might expect grocery spikes to occur without health concerns, indicating a complex relationship. The expected lead time is moderate, as health concerns may precede grocery spikes by a few days.
+  Policy recommendation: The National Emergency Crisis and Disaster Management Authority (NCEMA) should monitor health concern signals. If health concern increases while grocery spikes are detected, consider pre-positioning resources for food distribution within 3 days.
+
+Rule 2: [CROSS-DOMAIN]
   IF:   grocery_spike, high_positive_sentiment
-  THEN: low_emotion_low_mobility_signal
+  THEN: calm_mobile_baseline
   Support: 103 days (15.4%)
   Confidence: 85.4%
   Lift: 2.16
-  LLM: novelty=8/10  policy_relevance=9/10
-  Why it matters: This rule indicates that a spike in grocery shopping correlates with high positive sentiment, suggesting that positive emotions can lead to increased mobility in retail spaces.
-  Policy recommendation: Encourage positive messaging and community engagement during times of high grocery demand to maintain public morale and compliance.
-
-Rule 2: [CROSS-DOMAIN]
-  IF:   dominant_emotion_fear, low_emotion_low_mobility_signal
-  THEN: grocery_spike
-  Support: 222 days (33.1%)
-  Confidence: 83.3%
-  Lift: 1.96
-  LLM: novelty=7/10  policy_relevance=8/10
-  Why it matters: The presence of fear as a dominant emotion alongside low mobility signals suggests that fear can lead to increased grocery shopping, indicating a coping mechanism.
-  Policy recommendation: Monitor sentiment trends and provide reassurance to mitigate fear, potentially stabilizing grocery supply and demand.
+  Conviction: 4.145
+  Leverage: 0.070
+  Composite Score: 0.476
+  Temporal Validity: 0.500
+  LLM: novelty=7/10  policy_relevance=6/10
+  Why it matters: This rule is relevant to Phase 4, where high positive sentiment and grocery spikes lead to a calm mobile baseline. The direction is non-obvious as one might expect mobility to remain high with grocery spikes. The expected lead time is short, as sentiment changes can quickly influence mobility.
+  Policy recommendation: The UAE Ministry of Health and Prevention (MoHAP) should track positive sentiment alongside grocery spikes. If both are observed, consider reinforcing public health messaging to maintain calm and compliance.
 
 Rule 3: [CROSS-DOMAIN]
-  IF:   sentiment_shift_detected, low_emotion_low_mobility_signal
-  THEN: grocery_spike
-  Support: 145 days (21.6%)
-  Confidence: 82.8%
-  Lift: 1.94
-  LLM: novelty=7/10  policy_relevance=8/10
-  Why it matters: Sentiment shifts detected alongside low mobility signals predict grocery spikes, indicating that emotional changes can drive consumer behavior.
-  Policy recommendation: Implement timely communication strategies to address public sentiment shifts, potentially influencing shopping behaviors positively.
-
-Rule 4:
-  IF:   grocery_spike, weekend
-  THEN: low_emotion_low_mobility_signal
-  Support: 82 days (12.2%)
-  Confidence: 87.8%
-  Lift: 2.21
-  LLM: novelty=6/10  policy_relevance=7/10
-  Why it matters: This rule shows that grocery spikes during weekends correlate with low mobility signals, suggesting that weekend behaviors are influenced by emotional states.
-  Policy recommendation: Plan for increased grocery supply and staffing during weekends to accommodate potential spikes in shopping behavior.
-
-Rule 5: [CROSS-DOMAIN]
-  IF:   compliance_discussed, low_emotion_low_mobility_signal
-  THEN: grocery_spike
-  Support: 76 days (11.3%)
-  Confidence: 85.5%
+  IF:   grocery_spike, vaccine_mentioned
+  THEN: calm_mobile_baseline
+  Support: 176 days (26.2%)
+  Confidence: 79.5%
   Lift: 2.01
-  LLM: novelty=6/10  policy_relevance=7/10
-  Why it matters: The correlation between compliance discussions and grocery spikes indicates that discussions around compliance can lead to increased shopping activity.
-  Policy recommendation: Leverage compliance discussions to promote responsible shopping behaviors and ensure adequate supply in grocery stores.
+  Conviction: 2.951
+  Leverage: 0.105
+  Composite Score: 0.482
+  Temporal Validity: 0.500
+  LLM: novelty=6/10  policy_relevance=5/10
+  Why it matters: This rule connects grocery spikes and vaccine mentions during Phase 3, where the vaccine rollout is expected to correlate with increased grocery activity. The direction is plausible but not trivially implied, as vaccine discussions may not directly lead to grocery spikes. The expected lead time is immediate.
+  Policy recommendation: The UAE Food Security Office should monitor grocery spikes in conjunction with vaccine mentions. If both occur simultaneously, consider enhancing food supply chains to meet potential increased demand.
+
+Rule 4: [CROSS-DOMAIN]
+  IF:   grocery_spike, sentiment_improved
+  THEN: high_positive_sentiment
+  Support: 82 days (12.2%)
+  Confidence: 75.6%
+  Lift: 1.97
+  Conviction: 2.524
+  Leverage: 0.045
+  Composite Score: 0.346
+  Temporal Validity: 0.500
+  LLM: novelty=5/10  policy_relevance=4/10
+  Why it matters: This rule indicates that an improved sentiment correlates with high positive sentiment during Phase 3. The direction is somewhat expected but highlights the importance of sentiment in driving public behavior. The expected lead time is short.
+  Policy recommendation: The UAE Government Communications Office should promote positive sentiment campaigns. If sentiment improves, ensure that public health messaging aligns with this positivity to encourage compliance.
+
+Rule 5:
+  IF:   high_positive_sentiment, sentiment_shift_detected
+  THEN: sentiment_improved
+  Support: 179 days (26.7%)
+  Confidence: 82.7%
+  Lift: 2.75
+  Conviction: 4.036
+  Leverage: 0.140
+  Composite Score: 0.273
+  Temporal Validity: 0.000
+  LLM: novelty=4/10  policy_relevance=4/10
+  Why it matters: This rule shows that high positive sentiment and sentiment shift detection lead to improved sentiment, relevant in the context of Phase 3. The direction is somewhat expected, as positive sentiment typically leads to further positivity. The expected lead time is immediate.
+  Policy recommendation: The UAE National Media Council should monitor sentiment shifts. If high positive sentiment is detected, consider amplifying positive narratives to sustain public morale.
 
 Rule 6: [CROSS-DOMAIN]
-  IF:   mobility_drop_workplace, compliance_discussed
-  THEN: lockdown_mentioned
-  Support: 40 days (6.0%)
-  Confidence: 92.5%
-  Lift: 2.90
-  LLM: novelty=5/10  policy_relevance=6/10
-  Why it matters: Mobility drops in workplaces alongside compliance discussions predict lockdown mentions, suggesting that workplace mobility is a precursor to policy changes.
-  Policy recommendation: Monitor workplace mobility closely to anticipate the need for potential lockdown measures and communicate proactively.
+  IF:   residential_increase, sentiment_improved
+  THEN: high_positive_sentiment
+  Support: 92 days (13.7%)
+  Confidence: 75.0%
+  Lift: 1.95
+  Conviction: 2.462
+  Leverage: 0.050
+  Composite Score: 0.349
+  Temporal Validity: 0.500
+  LLM: novelty=3/10  policy_relevance=3/10
+  Why it matters: This rule connects residential increases and improved sentiment to high positive sentiment, which is somewhat expected. The timing aligns with the general trend of increased positivity during the pandemic. The expected lead time is immediate.
+  Policy recommendation: The UAE Statistics Centre should analyze residential trends alongside sentiment data. If residential increases are noted, consider community engagement initiatives to maintain positive sentiment.
 
-Rule 7: [CROSS-DOMAIN]
-  IF:   mobility_drop_workplace, policy_governance_discussion
-  THEN: health_concern
-  Support: 39 days (5.8%)
-  Confidence: 92.3%
-  Lift: 1.58
-  LLM: novelty=5/10  policy_relevance=6/10
-  Why it matters: This rule indicates that mobility drops in workplaces can predict health concerns, highlighting the impact of workplace dynamics on public health perceptions.
-  Policy recommendation: Address workplace health concerns through targeted interventions when mobility drops are observed.
+Rule 7:
+  IF:   calm_mobile_baseline
+  THEN: grocery_spike
+  Support: 266 days (39.6%)
+  Confidence: 83.8%
+  Lift: 1.97
+  Conviction: 3.549
+  Leverage: 0.163
+  Composite Score: 0.245
+  Temporal Validity: 0.000
+  LLM: novelty=2/10  policy_relevance=2/10
+  Why it matters: This rule indicates that a calm mobile baseline leads to grocery spikes, which is somewhat tautological as calmness typically correlates with increased mobility. The expected lead time is immediate.
+  Policy recommendation: The UAE Ministry of Economy should monitor mobility patterns. If a calm mobile baseline is observed, ensure that grocery supply chains are prepared for potential spikes.
 
-Rule 8: [CROSS-DOMAIN]
+Rule 8:
+  IF:   sentiment_improved, solidarity_messages
+  THEN: high_positive_sentiment
+  Support: 114 days (17.0%)
+  Confidence: 78.9%
+  Lift: 2.05
+  Conviction: 2.924
+  Leverage: 0.069
+  Composite Score: 0.074
+  Temporal Validity: 0.000
+  LLM: novelty=2/10  policy_relevance=2/10
+  Why it matters: This rule shows that improved sentiment and solidarity messages lead to high positive sentiment, which is somewhat expected. The timing aligns with general trends in sentiment during the pandemic. The expected lead time is immediate.
+  Policy recommendation: The UAE Community Development Authority should promote solidarity messages. If improved sentiment is detected, consider reinforcing community support initiatives.
+
+
+TOP PREDICTIVE (LAGGED/LEAD) RULES — 40 total after pruning:
+--------------------------------------------------------------------------------
+
+Predictive Rule 1:
   IF:   grocery_spike, lockdown_mentioned
-  THEN: vaccine_mentioned
-  Support: 69 days (10.3%)
-  Confidence: 85.5%
-  Lift: 1.90
-  LLM: novelty=5/10  policy_relevance=6/10
-  Why it matters: The relationship between grocery spikes and lockdown mentions suggests that increased grocery shopping may signal public anticipation of stricter measures.
-  Policy recommendation: Prepare for potential lockdowns by ensuring grocery supply chains are robust during periods of increased shopping activity.
+  THEN: vaccine_mentioned_lag7
+  Support: 68 days (10.4%)  Confidence: 85.3%  Lift: 1.90
+  LLM: novelty=9.0/10  policy_relevance=8.0/10
+  Lead time: 7 days
+  Why it matters: This rule emerges during Phase 3, where vaccine rollout is critical. The non-obvious direction is that a grocery spike and lockdown mention today can forecast vaccine discussions a week later, indicating public sentiment shifts towards vaccination.
+  Policy recommendation: The UAE's MoHAP should monitor grocery spikes and lockdown discussions as triggers to anticipate increased vaccine discourse, enabling proactive outreach and vaccination campaigns.
 
-Rule 9: [CROSS-DOMAIN]
-  IF:   grocery_spike, compliance_discussed
-  THEN: vaccine_mentioned
-  Support: 89 days (13.3%)
-  Confidence: 80.9%
-  Lift: 1.80
-  LLM: novelty=5/10  policy_relevance=6/10
-  Why it matters: Compliance discussions alongside grocery spikes indicate that public discourse can influence shopping behaviors, reflecting societal readiness for compliance.
-  Policy recommendation: Enhance public discussions around compliance to foster responsible shopping behaviors and manage supply effectively.
+Predictive Rule 2:
+  IF:   grocery_spike, high_positive_sentiment_lag1
+  THEN: calm_mobile_baseline
+  Support: 105 days (16.0%)  Confidence: 81.0%  Lift: 2.09
+  LLM: novelty=8.0/10  policy_relevance=8.0/10
+  Lead time: 7 days
+  Why it matters: In Phase 3, the relationship between high positive sentiment and grocery spikes today predicting calm mobility in a week is insightful. It suggests that positive public sentiment can lead to reduced mobility concerns.
+  Policy recommendation: NCEMA should track high positive sentiment alongside grocery spikes to anticipate shifts in mobility, allowing for timely adjustments in public health messaging.
 
-Rule 10: [CROSS-DOMAIN]
-  IF:   severe_lockdown_behavior, policy_governance_discussion
-  THEN: solidarity_messages
-  Support: 34 days (5.1%)
-  Confidence: 82.4%
-  Lift: 1.87
-  LLM: novelty=4/10  policy_relevance=5/10
-  Why it matters: The link between severe lockdown behavior and solidarity messages predicting solidarity indicates that emotional responses can influence compliance.
-  Policy recommendation: Promote solidarity messages to enhance community support during severe lockdowns, fostering compliance and cooperation.
+Predictive Rule 3:
+  IF:   grocery_spike, policy_governance_discussion_lag7
+  THEN: calm_mobile_baseline
+  Support: 72 days (11.0%)  Confidence: 83.3%  Lift: 2.16
+  LLM: novelty=8.0/10  policy_relevance=7.0/10
+  Lead time: 7 days
+  Why it matters: This rule indicates that discussions about policy governance today can lead to a calm mobile baseline in a week, particularly relevant in Phase 4. It highlights the importance of governance discourse in stabilizing public behavior.
+  Policy recommendation: DHA should monitor policy governance discussions to predict and manage public mobility patterns, ensuring timely interventions if mobility spikes are anticipated.
 
-Rule 11: [CROSS-DOMAIN]
-  IF:   severe_lockdown_behavior, solidarity_messages
-  THEN: lockdown_mentioned
-  Support: 55 days (8.2%)
-  Confidence: 81.8%
-  Lift: 2.57
-  LLM: novelty=4/10  policy_relevance=5/10
-  Why it matters: Severe lockdown behavior combined with solidarity messages suggests that emotional support can influence public compliance during crises.
-  Policy recommendation: Encourage community solidarity initiatives to bolster compliance during lockdowns.
+Predictive Rule 4:
+  IF:   high_positive_sentiment, calm_mobile_baseline
+  THEN: grocery_spike_lead2
+  Support: 98 days (14.9%)  Confidence: 88.8%  Lift: 2.08
+  LLM: novelty=7.0/10  policy_relevance=7.0/10
+  Lead time: 2 days
+  Why it matters: During Phase 4, the rule shows that high positive sentiment and calm mobility today can predict grocery spikes in two days. This feedback loop is crucial for understanding consumer behavior.
+  Policy recommendation: MoHAP should observe high positive sentiment and calm mobility as indicators to prepare for potential increases in grocery demand, facilitating supply chain management.
 
-Rule 12: [CROSS-DOMAIN]
-  IF:   mobility_drop_workplace, policy_governance_discussion
-  THEN: lockdown_mentioned
-  Support: 39 days (5.8%)
-  Confidence: 84.6%
-  Lift: 2.65
-  LLM: novelty=4/10  policy_relevance=5/10
-  Why it matters: Mobility drops in workplaces alongside policy governance discussions predict lockdown mentions, indicating that workplace dynamics influence policy decisions.
-  Policy recommendation: Engage with workplace leaders to assess mobility trends and inform policy discussions proactively.
+Predictive Rule 5:
+  IF:   lockdown_mentioned, lockdown_mentioned_lag3
+  THEN: residential_increase_lead2
+  Support: 79 days (12.0%)  Confidence: 79.7%  Lift: 1.81
+  LLM: novelty=7.0/10  policy_relevance=6.0/10
+  Lead time: 2 days
+  Why it matters: This rule captures the essence of Phase 2, where lockdown mentions can forecast residential increases in two days. It highlights the potential for immediate public response to policy discussions.
+  Policy recommendation: NCEMA should monitor lockdown mentions to anticipate residential mobility changes, allowing for timely public health responses to emerging trends.
 
-Rule 13: [CROSS-DOMAIN]
-  IF:   severe_lockdown_behavior, policy_governance_discussion
-  THEN: lockdown_mentioned
-  Support: 34 days (5.1%)
-  Confidence: 88.2%
-  Lift: 2.77
-  LLM: novelty=4/10  policy_relevance=5/10
-  Why it matters: Severe lockdown behavior and policy governance discussions leading to lockdown mentions highlight the role of governance in shaping public behavior.
-  Policy recommendation: Strengthen governance communication to clarify the rationale behind lockdown measures and enhance public understanding.
+Predictive Rule 6:
+  IF:   grocery_spike
+  THEN: grocery_spike_lead7
+  Support: 279 days (42.5%)  Confidence: 95.0%  Lift: 2.18
+  LLM: novelty=6.0/10  policy_relevance=6.0/10
+  Lead time: 7 days
+  Why it matters: This rule indicates that a grocery spike today can predict another grocery spike in a week, which is relevant during Phase 2 when compliance fatigue is setting in. It shows the persistence of consumer behavior.
+  Policy recommendation: DHA should keep track of grocery spikes as a signal for ongoing consumer behavior, preparing for sustained demand in retail sectors.
 
-Rule 14: [CROSS-DOMAIN]
-  IF:   grocery_spike, policy_governance_discussion
-  THEN: vaccine_mentioned
-  Support: 67 days (10.0%)
-  Confidence: 88.1%
-  Lift: 1.96
-  LLM: novelty=3/10  policy_relevance=4/10
-  Why it matters: Grocery spikes combined with policy governance discussions predict vaccine mentions, suggesting that shopping behavior may reflect public health priorities.
-  Policy recommendation: Utilize grocery shopping trends to inform public health messaging around vaccination efforts.
+Predictive Rule 7:
+  IF:   grocery_spike, sentiment_improved_lag1
+  THEN: grocery_spike_lead7
+  Support: 79 days (12.0%)  Confidence: 100.0%  Lift: 2.30
+  LLM: novelty=6.0/10  policy_relevance=5.0/10
+  Lead time: 7 days
+  Why it matters: The rule suggests that an improvement in sentiment today can lead to a grocery spike in a week, which is significant during Phase 3. It indicates the potential for sentiment to drive consumer behavior.
+  Policy recommendation: MoHAP should monitor sentiment improvements to anticipate shifts in grocery demand, enabling better resource allocation in retail.
 
-Rule 15: [CROSS-DOMAIN]
-  IF:   high_positive_sentiment, low_emotion_low_mobility_signal
+Predictive Rule 8:
+  IF:   calm_mobile_baseline, high_positive_sentiment_lag1
   THEN: grocery_spike
-  Support: 101 days (15.1%)
-  Confidence: 87.1%
-  Lift: 2.04
-  LLM: novelty=3/10  policy_relevance=4/10
-  Why it matters: High positive sentiment alongside low mobility signals predicts grocery spikes, indicating that emotional well-being can drive consumer behavior.
-  Policy recommendation: Foster positive community sentiment to encourage responsible shopping behaviors during low mobility periods.
+  Support: 96 days (14.6%)  Confidence: 88.5%  Lift: 2.09
+  LLM: novelty=5.0/10  policy_relevance=5.0/10
+  Lead time: 7 days
+  Why it matters: This rule shows that calm mobility and high positive sentiment today can predict grocery spikes in a week, relevant in Phase 4. It reflects the interconnectedness of sentiment and mobility.
+  Policy recommendation: NCEMA should observe calm mobility and sentiment levels to forecast grocery demand, allowing for proactive supply chain management.
 
-Rule 16: [CROSS-DOMAIN]
-  IF:   severe_lockdown_behavior, health_concern
-  THEN: lockdown_mentioned
-  Support: 59 days (8.8%)
-  Confidence: 81.4%
-  Lift: 2.55
-  LLM: novelty=3/10  policy_relevance=4/10
-  Why it matters: Severe lockdown behavior combined with health concerns suggests that emotional responses can influence public health perceptions.
-  Policy recommendation: Address health concerns through targeted messaging during periods of severe lockdown behavior.
+Predictive Rule 9:
+  IF:   sentiment_shift_detected, high_positive_sentiment_lag1
+  THEN: sentiment_worsened
+  Support: 159 days (24.2%)  Confidence: 86.2%  Lift: 3.00
+  LLM: novelty=5.0/10  policy_relevance=4.0/10
+  Lead time: 0 days
+  Why it matters: This rule indicates that a sentiment shift detected today can lead to sentiment worsening immediately, which is expected but highlights the importance of monitoring sentiment dynamics.
+  Policy recommendation: DHA should continuously monitor sentiment shifts to manage public health messaging effectively, ensuring timely responses to emerging concerns.
 
-Rule 17: [CROSS-DOMAIN]
-  IF:   vaccine_mentioned, low_emotion_low_mobility_signal
-  THEN: grocery_spike
-  Support: 159 days (23.7%)
-  Confidence: 88.1%
-  Lift: 2.07
-  LLM: novelty=3/10  policy_relevance=4/10
-  Why it matters: Vaccine mentions following low mobility signals indicate that public health messaging can influence consumer behavior.
-  Policy recommendation: Enhance vaccine promotion during periods of low mobility to encourage public participation in vaccination efforts.
+Predictive Rule 10:
+  IF:   sentiment_shift_detected, sentiment_improved_lag1
+  THEN: sentiment_worsened
+  Support: 129 days (19.6%)  Confidence: 80.6%  Lift: 2.80
+  LLM: novelty=4.0/10  policy_relevance=4.0/10
+  Lead time: 0 days
+  Why it matters: This rule shows that a sentiment shift detected today can lead to sentiment worsening immediately, which is a common pattern but emphasizes the need for vigilance in sentiment monitoring.
+  Policy recommendation: MoHAP should track sentiment shifts closely to prepare for potential public health implications, ensuring that interventions are timely and effective.
 
-Rule 18: [CROSS-DOMAIN]
-  IF:   lockdown_mentioned, low_emotion_low_mobility_signal
-  THEN: grocery_spike
-  Support: 62 days (9.2%)
-  Confidence: 82.3%
-  Lift: 1.93
-  LLM: novelty=3/10  policy_relevance=4/10
-  Why it matters: Lockdown mentions leading to grocery spikes suggest that public anticipation of restrictions can drive consumer behavior.
-  Policy recommendation: Prepare grocery supply chains for anticipated spikes in demand during discussions of potential lockdowns.
+
+================================================================================
+OPERATIONAL POLICY BRIEFS:
+--------------------------------------------------------------------------------
+Full operational policy briefs (signal windows, lead times, action
+playbooks, false-alarm risk ratings) are in:
+  results/policy_briefs.txt
 
 ================================================================================

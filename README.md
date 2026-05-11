@@ -14,15 +14,23 @@ This project investigates how **public mobility patterns** and **online emotiona
 ## Pipeline Overview
 
 ```
-Raw Data                  Processing               Analysis              Output
-─────────                 ──────────               ────────              ──────
-Google Mobility  ──►  preprocess_and_features  ──►  fca_analysis    ──►  association_rules.csv
-Reddit Posts     ──►       (binary matrix)     ──►  (FCA lattice)   ──►  formal_concepts.csv
+Raw Data                   Processing                Analysis                  Output
+─────────                  ──────────                ────────                  ──────
+Google Mobility  ──►  preprocess_and_features  ──►  fca_analysis         ──►  association_rules.csv
+Reddit Posts     ──►       (binary matrix)     ──►  (FCA lattice)        ──►  formal_concepts.csv
+                                │                        │
+                     lagged_features.py          prune_rules.py          ──►  association_rules_predictive_pruned.csv
+                     (lag 1/3/7, lead 2/7)       (6-stage filter)             (40 clean predictive rules)
                                                          │
-                                               evaluate_rules_llm   ──►  top_cross_domain_rules.txt
+                                               evaluate_rules_llm        ──►  association_rules_evaluated.csv
+                                               (UAE-calibrated LLM)      ──►  association_rules_predictive_evaluated.csv
                                                          │
-                                               visualize_results    ──►  summary_report.txt
-                                                                         charts/
+                                               temporal_backtest         ──►  association_rules_stable.csv
+                                                         │
+                                               policy_briefs             ──►  policy_briefs.txt
+                                                         │
+                                               visualize_results         ──►  summary_report.txt
+                                                                              6 × charts/
 ```
 
 ### Step 1 — Data Collection
@@ -49,50 +57,87 @@ Reddit collection uses a multi-subreddit, multi-query, multi-sort strategy acros
 - Sentiment: `high_negative_sentiment`, `high_positive_sentiment`, `sentiment_improved`, `sentiment_worsened`, `sentiment_shift_detected`, `dominant_emotion_fear`, `mixed_emotions`
 - Keywords: `fear_keywords_present`, `anger_mentioned`, `anxiety_keywords_present`, `sadness_keywords_present`, `solidarity_messages`
 - Topics: `covid_topic_detected`, `lockdown_mentioned`, `vaccine_mentioned`, `health_concern`, `compliance_discussed`, `policy_governance_discussion`
-- Composite: `emotion_with_mobility_signal`, `emotion_mobility_mismatch`, `low_emotion_low_mobility_signal`
+- Composite: `emotion_with_mobility_signal`, `emotion_mobility_mismatch`, `calm_mobile_baseline`
+  - `calm_mobile_baseline`: days where **neither** elevated negative emotion **nor** any mobility-disruption signal is present — a positive behavioural-state indicator representing routine/recovery days (distinct from a residual catch-all)
 
 ### Step 3 — Formal Concept Analysis (`fca_analysis.py`)
 - Builds a **Galois lattice** (formal context) over the binary matrix
-- To prevent combinatorial explosion, objects > 150 are **aggregated to weekly majority-vote** (97 weekly objects) for lattice construction; rule mining runs on the full 671-day daily data
-- Extracts **association rules** with configurable thresholds:
-  - `min_support = 0.05` (≥ 5 % of days)
-  - `min_confidence = 0.80`
-  - `min_lift = 1.05`
-  - `max_conclusion_prevalence = 0.75` (blocks near-constant conclusions)
-- A **tautology filter** removes definitionally true rules (e.g. concluding `severe_lockdown_behavior` when its three required components are all in the premise)
+- To prevent combinatorial explosion, objects > 150 are **aggregated to weekly majority-vote** for lattice construction; rule mining runs on the full 671-day daily data
+- Extracts **same-day association rules** with hard statistical thresholds:
+  - `min_support ≥ 10 %`, `min_confidence ≥ 75 %`, `min_lift ≥ 1.8`
+- A **tautology filter** removes definitionally true rules
 - Rules are tagged `cross_domain = True` when they span both mobility and emotion feature sets
+- **Result: 23 raw same-day rules → 9 after full pruning**
+
+### Step 3b — Lagged Feature Matrix (`src/features/lagged_features.py`)
+- Generates a **671 × 111** feature matrix with lags (1, 3, 7 days prior) and leads (2, 7 days ahead) for all 29 base features
+- Rules are then mined on this matrix to discover **cross-time-window associations**
+
+### Step 3c — Predictive Rule Pruning (`src/rules/prune_rules.py`)
+A 6-stage filter pipeline removes artefact rules before any evaluation:
+1. **Same-lag artefacts** — drops rules where all features share the same lag number
+2. **Same-day contamination** — removes temporally-unsuffixed rules (already covered by same-day analysis)
+3. **Leakage** — drops rules with `_lead` features in the antecedent
+4. **Tautology** — drops rules where premise and conclusion belong to the same mobility or sentiment group
+5. **Bidirectional deduplication** — keeps the higher-conviction direction of A↔B pairs
+6. **Subsumption** — removes rules whose antecedent is a superset of a stronger rule
+- **Result: 3483 raw predictive rules → 40 clean rules**
 
 ### Step 4 — LLM Rule Evaluation (`evaluate_rules_llm.py`)
 *(Optional — requires `OPENAI_API_KEY`)*
 
+Two separate LLM evaluation passes run in sequence:
+
+**Same-day rules:**
 - Sends up to 100 stratified candidate rules to `gpt-4o-mini` in a single batch call
-- Stratification: 50 social-conclusion rules + 50 mobility-conclusion rules (both cross-domain directions represented)
-- LLM scores each rule on **novelty** (1–10) and **policy relevance** (1–10), returns a ranked list of the top 20 with:
-  - "Why it matters" reasoning
-  - Concrete policy recommendation for UAE health/government officials
+- Scores each rule on **novelty** (1–10) and **policy relevance** (1–10)
+- System prompt embeds the UAE COVID-19 policy timeline (4 phases, exact dates) and mandates UAE-specific agency recommendations (NCEMA, DHA, MoHAP, WAM)
 - Without `--llm`, rules are ranked statistically (cross-domain first, then lift)
 
-### Step 5 — Visualisation & Report (`visualize_results.py`)
-Generates four charts and a `summary_report.txt`:
-- `mobility_trends.png` — UAE mobility category time series
-- `sentiment_timeline.png` — daily sentiment compound score over the pandemic
-- `features_heatmap.png` — binary feature activation correlation matrix
-- `combined_analysis.png` — overlaid mobility and sentiment signals
-- `summary_report.txt` — full LLM-selected rule set with scores and policy recommendations (falls back to statistical ranking if LLM step was skipped)
+**Predictive rules:**
+- Separate `PREDICTIVE_SYSTEM_PROMPT` explains lag/lead notation and rewards cross-domain temporal rules
+- Novelty rubric anchors 9–10 to rules where an emotion/discourse signal today forecasts a mobility change in 2–7 days (the most operationally valuable direction)
+- Policy rubric requires a `lead_time_days` estimate and a named UAE body + pre-emptive action
+- **Result: top 10 predictive rules selected with LLM reasoning and policy recommendations**
+
+### Step 5 — Temporal Backtest (`src/validation/temporal_backtest.py`)
+- 70/30 chronological split (train 2020-03–2021-06, holdout 2021-07–2021-12)
+- Drops rules where confidence drops > 10 percentage points on the holdout period
+- **Result: 8/9 same-day rules stable (88%)**; `grocery_spike, weekend → calm_mobile_baseline` dropped (12.2 pp drop)
+
+### Step 6 — Policy Briefs (`src/reporting/policy_briefs.py`)
+- Generates structured operational briefs per rule: signal window, lead time, action playbook, false-alarm risk
+- Outputs `results/policy_briefs.txt`; predictive rule briefs in `results/fca/top_predictive_rules.txt`
+
+### Step 7 — Visualisation & Report (`visualize_results.py`)
+Generates six charts and a `summary_report.txt`:
+- `mobility_trends.png` — UAE 4-category mobility with 7-day rolling average + phase shading
+- `sentiment_timeline.png` — compound sentiment + pos/neg fractions with 14-day rolling average
+- `features_heatmap.png` — bi-weekly aggregated binary feature activation (readable x-axis, month labels)
+- `combined_analysis.png` — 3-panel: mobility index / sentiment / binary key signals with phase bands
+- `rules_overview.png` — bubble chart: support vs confidence, bubble size = lift², colour = cross-domain
+- `feature_activation.png` — horizontal bar chart of all 29 feature activation rates, colour-coded by domain
+- `summary_report.txt` — full LLM-selected rule set with scores, reasoning, and policy recommendations
 
 ---
 
 ## Key Findings
 
-Top cross-domain associations discovered (LLM novelty ≥ 7/10):
+### Same-Day Rules (top cross-domain, LLM novelty ≥ 7/10, backtest-stable)
 
 | Rule | Finding | Support | Confidence | Lift |
 |------|---------|---------|------------|------|
-| `dominant_emotion_fear + low_mobility → grocery_spike` | Background fear drives retail surges even on otherwise-quiet days — pandemic pantry-loading behaviour | 33 % of days | 83 % | 1.96 |
-| `sentiment_shift_detected + low_mobility → grocery_spike` | Any sentiment movement (not just fear) predicts stocking behaviour | 22 % of days | 83 % | 1.94 |
-| `grocery_spike + high_positive_sentiment → low_crisis_baseline` | Positive emotional days with retail activity signal calm, non-lockdown periods | 15 % of days | 85 % | 2.16 |
-| `workplace_drop + compliance_discussed → lockdown_mentioned` | Workplace mobility drops co-occur with compliance discourse as a leading indicator of lockdown announcements | 6 % of days | 93 % | 2.90 |
-| `grocery_spike + compliance_discussed → vaccine_mentioned` | Compliance-engaged shoppers bridge to vaccination discourse — a signal for targeted rollout messaging | 13 % of days | 81 % | 1.80 |
+| `health_concern + calm_mobile_baseline → grocery_spike` | Residual health anxiety on otherwise-normal days predicts retail surges — pandemic pantry-loading under surface-level calm | 20% of days | 77% | 1.82 |
+| `grocery_spike + high_positive_sentiment → calm_mobile_baseline` | Positive emotional days with grocery activity signal recovery/routine periods | 15% of days | 85% | 2.16 |
+| `grocery_spike + vaccine_mentioned → calm_mobile_baseline` | Vaccine-era grocery activity co-occurs with stable mobility — Phase 3 normalisation signal | 26% of days | 80% | 2.01 |
+
+### Predictive Rules (top cross-domain, LLM novelty ≥ 8/10)
+
+| Rule | Finding | Lead time | Confidence | Lift |
+|------|---------|-----------|------------|------|
+| `grocery_spike + lockdown_mentioned → vaccine_mentioned` (7 days later) | Crisis-adjacent consumer behaviour today forecasts vaccination discourse next week | 7 days | 85% | 1.90 |
+| `grocery_spike + high_positive_sentiment_lag1 → calm_mobile_baseline` | Yesterday's positive sentiment + today's grocery activity forecasts routine mobility in a week | 7 days | 81% | 2.09 |
+| `high_positive_sentiment + calm_mobile_baseline → grocery_spike` (2 days later) | Stable, positive days reliably precede a consumer activity uptick within 48 hours | 2 days | 89% | 2.08 |
 
 ---
 
@@ -152,7 +197,14 @@ make clean-all   # remove results/ and data/processed/
 ### LLM evaluation only (after FCA has been run)
 ```sh
 python scripts/evaluate_rules_llm.py          # statistical ranking
-python scripts/evaluate_rules_llm.py --llm    # LLM batch selection
+python scripts/evaluate_rules_llm.py --llm    # LLM batch selection (same-day + predictive)
+```
+
+### Module-level steps
+```sh
+python -m src.features.lagged_features        # build 671×111 lag/lead matrix
+python -m src.validation.temporal_backtest    # 70/30 backtest of same-day rules
+python -m src.reporting.policy_briefs         # generate policy_briefs.txt
 ```
 
 ---
@@ -164,7 +216,7 @@ capstone-project-covid/
 ├── data/
 │   ├── raw/                         # Source data (large files git-ignored)
 │   │   ├── Global_Mobility_Report.csv
-│   │   └── reddit_wildfire_posts_by_day.json
+│   │   └── reddit_covid_uae_posts_by_day.json
 │   └── processed/                   # Generated feature files
 │       ├── fca_binary_matrix.csv
 │       ├── mobility_data_processed.csv
@@ -172,11 +224,22 @@ capstone-project-covid/
 ├── results/
 │   ├── fca/
 │   │   ├── association_rules.csv
-│   │   ├── association_rules_evaluated.csv
+│   │   ├── association_rules_evaluated.csv       # Same-day rules + LLM scores
+│   │   ├── association_rules_stable.csv          # Backtest-passing rules
+│   │   ├── association_rules_predictive_pruned.csv  # 40 clean predictive rules
+│   │   ├── association_rules_predictive_evaluated.csv  # Predictive + LLM scores
 │   │   ├── formal_concepts.csv
-│   │   ├── crisis_context.cxt          # Galicia-compatible FCA context
-│   │   └── top_cross_domain_rules.txt  # LLM-selected top rules
+│   │   ├── crisis_context.cxt                   # Galicia-compatible FCA context
+│   │   ├── top_cross_domain_rules.txt            # LLM-selected same-day rules
+│   │   └── top_predictive_rules.txt              # LLM-selected predictive rules
 │   ├── visualizations/
+│   │   ├── mobility_trends.png
+│   │   ├── sentiment_timeline.png
+│   │   ├── features_heatmap.png
+│   │   ├── combined_analysis.png
+│   │   ├── rules_overview.png
+│   │   └── feature_activation.png
+│   ├── policy_briefs.txt
 │   └── summary_report.txt
 ├── scripts/
 │   ├── collect_mobility_data.py
@@ -187,6 +250,17 @@ capstone-project-covid/
 │   ├── evaluate_rules_llm.py
 │   ├── visualize_results.py
 │   └── run_full_pipeline.py
+├── src/
+│   ├── features/
+│   │   └── lagged_features.py       # Lag/lead feature matrix (671×111)
+│   ├── rules/
+│   │   └── prune_rules.py           # 6-stage rule quality filter
+│   ├── scoring/
+│   │   └── score_rules.py           # Statistical composite scoring
+│   ├── validation/
+│   │   └── temporal_backtest.py     # 70/30 chronological backtest
+│   └── reporting/
+│       └── policy_briefs.py         # Structured operational briefs
 ├── .env.example
 ├── Makefile
 └── requirements.txt
