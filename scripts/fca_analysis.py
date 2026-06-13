@@ -291,7 +291,7 @@ class FCAAnalyzer:
             labels=concept_labels,
             node_color='lightblue',
             node_size=3000,
-            font_size=8,
+            font_size=12,
             font_weight='bold',
             arrows=True,
             arrowsize=20,
@@ -300,7 +300,7 @@ class FCAAnalyzer:
             with_labels=True,
         )
 
-        plt.title("Galois Lattice - Crisis Behavior Formal Concept Analysis", fontsize=16, fontweight='bold')
+        plt.title("Galois Lattice - Crisis Behavior Formal Concept Analysis", fontsize=20, fontweight='bold')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 
