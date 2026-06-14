@@ -1,20 +1,24 @@
 """
-LLM-based rule evaluation and prioritization.
+LLM-based rule annotation (NOT selection or ranking).
 
-Loads association rules from FCA, then optionally uses an OpenAI-compatible
-LLM to identify the top 10 most novel and policy-relevant rules in a single
-batch call.  Cross-domain rules are always flagged and sorted to the top
-regardless of whether the LLM step is run.
+Loads association rules from FCA. Rule validity is determined ENTIRELY by the
+statistical pipeline (support, confidence, lift), multi-stage pruning, and the
+70/30 chronological backtest. The optional LLM step is a post-hoc QUALITATIVE
+ANNOTATION layer only: it scores each already-valid rule for policy relevance
+and writes a plain-language rationale and a named-agency recommendation. It
+never selects, ranks, or validates rules. Rule ordering is always statistical.
 
-Usage (without LLM — statistical ranking only):
+Usage (without LLM -- statistical ordering only):
     python scripts/evaluate_rules_llm.py
 
-Usage (with LLM selection — requires OPENAI_API_KEY in .env or environment):
+Usage (with LLM annotation -- requires OPENAI_API_KEY in .env or environment):
     python scripts/evaluate_rules_llm.py --llm
 
 Output:
-    results/fca/association_rules_evaluated.csv   (all rules with LLM scores if run)
-    results/fca/top_cross_domain_rules.txt        (top 10 human-readable summary)
+    results/fca/association_rules_evaluated.csv             (all rules, annotated if --llm)
+    results/fca/top_cross_domain_rules.txt                  (human-readable summary)
+    results/fca/association_rules_predictive_evaluated.csv  (predictive rules, annotated)
+    results/fca/top_predictive_rules.txt                    (predictive summary)
 """
 
 import argparse
@@ -29,9 +33,7 @@ import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
-# Ensure project root is on sys.path so 'src.*' sub-packages are importable
-# whether the script is called as 'python scripts/evaluate_rules_llm.py' or
-# via 'PYTHONPATH=. python scripts/evaluate_rules_llm.py'.
+# Ensure project root is on sys.path so 'src.*' sub-packages are importable.
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -95,23 +97,16 @@ def _load_env() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Deterministic temporal helpers
+# Deterministic temporal helpers (NEVER taken from the LLM)
 # ---------------------------------------------------------------------------
 
 def compute_lead_time_days(premise: str, conclusion: str) -> int:
     """Forecast horizon implied by a rule's temporal structure.
 
-    This is computed from the rule itself — never taken from the LLM, which has
-    no reliable way to read the suffix and tends to hallucinate a horizon.
-
-    - ``*_lead{n}`` consequent → +n   (forecasts n days ahead)
-    - same-day consequent with ``*_lag{n}`` antecedent → n
-      (uses an n-day-old signal to call today; actionable horizon is the
-       largest antecedent lag)
-    - otherwise → 0   (same-day rule)
-
-    Backward (``*_lag`` consequent) rules should already be pruned upstream;
-    if one is seen here we return 0 rather than inventing a horizon.
+    Computed from the rule itself — never from the LLM.
+      - ``*_lead{n}`` consequent → +n
+      - same-day consequent with ``*_lag{n}`` antecedent → n (largest lag)
+      - otherwise → 0
     """
     conclusion = str(conclusion).strip()
     m = re.search(r"_lead(\d+)$", conclusion)
@@ -128,7 +123,7 @@ def _is_backward_rule(premise: str, conclusion: str) -> bool:
     return bool(re.search(r"_lag\d+$", str(conclusion).strip()))
 
 
-def _feature_set(rule: pd.Series) -> frozenset[str]:
+def _feature_set(rule: pd.Series) -> frozenset:
     """Return the full set of features referenced in a rule (premise + conclusion)."""
     parts = [p.strip() for p in rule["premise"].split(",")]
     parts.append(rule["conclusion"].strip())
@@ -136,13 +131,9 @@ def _feature_set(rule: pd.Series) -> frozenset[str]:
 
 
 def tag_cross_domain(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Add / refresh the cross_domain flag based on whether a rule spans
-    both the mobility and emotion feature domains.
-
-    Lag/lead suffixes are stripped before domain lookup so that, e.g.,
-    ``vaccine_mentioned_lead7`` is still recognised as an EMOTION feature.
-    """
+    """Add / refresh the cross_domain flag. Lag/lead suffixes are stripped
+    before domain lookup so e.g. vaccine_mentioned_lead7 still resolves to
+    the EMOTION domain."""
     def _base(f: str) -> str:
         return re.sub(r"_(lag|lead)\d+$", "", f.strip())
 
@@ -156,51 +147,37 @@ def tag_cross_domain(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
-# LLM batch selection
+# LLM annotation prompts (annotation only — no selection, no ranking)
 # ---------------------------------------------------------------------------
 
-# Number of candidate rules fed to the LLM for comparison.
-# The LLM sees all of these and picks the best TOP_N.
-CANDIDATE_POOL = 100
-TOP_N_LLM = 20
+ANNOTATE_SAMEDAY_PROMPT = textwrap.dedent("""\
+    You are an expert data scientist and public health policy advisor annotating
+    association rules mined from UAE COVID-19 crisis behavior data
+    (March 2020 – December 2021). The dataset combines daily Google Community
+    Mobility metrics with Reddit sentiment signals.
 
-BATCH_SYSTEM_PROMPT = textwrap.dedent("""\
-    You are an expert data scientist and public health policy advisor reviewing
-    association rules mined from crisis behavior data during the COVID-19 period
-    in the UAE (March 2020 – December 2021). The dataset combines daily Google
-    Community Mobility metrics with Reddit sentiment signals (fear, solidarity,
-    compliance discussions, vaccine mentions, etc.).
+    IMPORTANT: These rules have ALREADY been validated by a statistical pipeline
+    (support, confidence, lift thresholds), multi-stage pruning, and a
+    chronological backtest. Your job is NOT to select, rank, validate, or reject
+    any rule. Every rule is statistically valid. You provide ONLY a qualitative
+    annotation for each: a policy-relevance score, a short rationale, and a
+    named-agency recommendation. Annotate EVERY rule; omit none.
 
-    ── UAE COVID-19 POLICY TIMELINE (use this to anchor your scores) ──────────
-    Phase 1 — Onset & first lockdown (Mar–May 2020):
-      - 15 Mar 2020: Schools close, restaurants limited to delivery/takeaway.
-      - 26 Mar 2020: National disinfection programme; nightly curfew 8pm–6am.
-      - Apr 2020: Strict stay-home order; grocery stores exempted; grocery spikes
-        documented. Highest fear sentiment in dataset.
-
-    Phase 2 — Controlled reopening (Jun–Dec 2020):
-      - Jun 2020: Partial reopening of retail, restaurants at 30% capacity.
-      - Compliance fatigue begins: solidarity discourse drops, compliance_discussed
-        declines despite partial_restrictions remaining active.
-      - Sep–Oct 2020: Second wave; workplace drop renewed.
-
-    Phase 3 — Vaccine rollout & optimism (Jan–Aug 2021):
-      - Jan 2021: UAE launches one of the world's fastest per-capita vaccine
-        programmes; vaccine_mentioned spikes on Reddit.
-      - Feb–Mar 2021: positive sentiment recovery; grocery_spike normalises.
-      - High positive sentiment + vaccine discussion co-occur with reduced fear.
-
-    Phase 4 — Endemic transition (Sep–Dec 2021):
-      - Sep 2021: Most restrictions lifted; mobility returns toward baseline.
-      - Residual health_concern remains in online discourse even as mobility
-        recovers — a decoupling signal.
+    ── UAE COVID-19 POLICY TIMELINE ──────────────────────────────────────────
+    Phase 1 — Onset & first lockdown (Mar–May 2020): strict stay-home; curfew;
+      grocery stores exempted; grocery spikes; peak fear sentiment.
+    Phase 2 — Controlled reopening (Jun–Dec 2020): partial retail/workplace
+      reopening; compliance fatigue; second wave Sep–Oct.
+    Phase 3 — Vaccine rollout & optimism (Jan–Aug 2021): fast per-capita vaccine
+      programme; vaccine_mentioned spikes; positive sentiment recovery.
+    Phase 4 — Endemic transition (Sep–Dec 2021): restrictions lifted; mobility
+      returns to baseline; residual health_concern persists in discourse.
     ──────────────────────────────────────────────────────────────────────────
 
-    FEATURE DOMAINS:
-    - MOBILITY features: mobility_drop_retail, mobility_drop_transit,
+    MOBILITY features: mobility_drop_retail, mobility_drop_transit,
       mobility_drop_workplace, residential_increase, grocery_spike,
       severe_lockdown_behavior, partial_restrictions
-    - SOCIAL/EMOTION features: high_negative_sentiment, dominant_emotion_fear,
+    SOCIAL/EMOTION features: high_negative_sentiment, dominant_emotion_fear,
       fear_keywords_present, anger_mentioned, anxiety_keywords_present,
       sadness_keywords_present, high_positive_sentiment, mixed_emotions,
       solidarity_messages, sentiment_worsened, sentiment_improved,
@@ -208,62 +185,32 @@ BATCH_SYSTEM_PROMPT = textwrap.dedent("""\
       vaccine_mentioned, health_concern, compliance_discussed,
       policy_governance_discussion
 
-    ── NOVELTY SCORING RUBRIC (1–10) ─────────────────────────────────────────
-    Score the rule on HOW UNEXPECTED the association is given the UAE timeline above.
-
-    10 — Contradicts or meaningfully extends the known policy narrative.
-         Example: positive sentiment predicts INCREASED mobility drop (counter-intuitive
-         compliance signal that would not be predicted from policy dates alone).
-     8–9 — Cross-domain, directional, and not explainable by a single policy event.
-         Example: health_concern persisting AFTER mobility recovery in Phase 4
-         (decoupling of discourse from behaviour).
-     6–7 — Cross-domain, directional, but timing aligns with an obvious policy event.
-         Example: vaccine_mentioned + grocery_spike in Phase 3 (plausible but not trivially
-         implied by the vaccine rollout date).
-     4–5 — Same domain or explainable by direct policy co-occurrence.
-         Example: lockdown_mentioned → mobility_drop during Phase 1 curfew.
-     1–3 — Tautological or near-constant feature (covid_topic_detected = 85% of days).
-    ──────────────────────────────────────────────────────────────────────────
-
     ── POLICY RELEVANCE SCORING RUBRIC (1–10) ────────────────────────────────
-    Score on WHETHER a UAE official could act on this rule as an early-warning signal.
-
-    10 — Emotion/discourse signal PRECEDES a real-world mobility outcome by a detectable
-         lead time AND the signal is specific enough to trigger a named intervention
-         (e.g., "if solidarity drops while partial_restrictions active → pre-position
-         enforcement resources within 3 days").
-     8–9 — Cross-domain leading indicator; action is clear but lead time is implicit.
-     6–7 — Useful monitoring signal; action requires additional validation.
-     4–5 — Interesting pattern but same-day correlation only; no actionable lead.
-     1–3 — Consequent is too broad, too frequent, or too obvious to justify specific action.
+    This is an annotation aid for the reader; it does NOT determine whether the
+    rule is kept (the statistical pipeline already did that).
+    10 — Directly actionable by a named UAE body (NCEMA, DHA, MoHAP, WAM) with a
+         specific trigger and action.
+     8–9 — Operationally useful; named agency and action obvious but needs one
+         additional validation step.
+     6–7 — Useful monitoring signal; further validation required.
+     4–5 — Situational awareness only; no clear intervention opportunity.
+     1–3 — Too generic or too slow-changing to drive specific action.
     ──────────────────────────────────────────────────────────────────────────
 
-    MANDATORY EXCLUSIONS — do NOT select rules where:
-    - residential_increase is the conclusion and any mobility_drop is in the premise.
-    - Both premise and conclusion are purely mobility features.
-    - covid_topic_detected or dominant_emotion_fear is the conclusion (both active ~85% of days).
-    - The rule is a near-duplicate of a higher-ranked rule already selected.
-    - Conclusion is trivially expected from premise semantics
-      (e.g., lockdown_mentioned → mobility_drop; sentiment_worsened → high_negative_sentiment).
-    - MORE THAN 2 rules share the same conclusion feature in your top 10.
+    For cross-domain rules, note in the rationale which crisis phase the rule
+    most relates to and whether the direction is operationally interesting.
 
-    PREFER rules that:
-    - Reveal a phase-transition signal (discourse shifts BEFORE mobility shifts, or vice versa).
-    - Capture compliance fatigue (positive mobility + reduced solidarity/compliance).
-    - Capture vaccine-era decoupling (high positive sentiment while health concern remains).
-    - Show weekend vs weekday asymmetry in crisis response.
+    IMPORTANT: Return EXACTLY ONE object per input rule, with the same rule_id.
+    The number of objects MUST equal the number of rules provided. Do not omit,
+    filter, deduplicate, or reorder by importance.
 
-    Your task: from the numbered candidate rules below, select and rank the
-    TOP 20 that best satisfy the above criteria.
-
-    Return ONLY a JSON array of exactly 20 objects, ordered best-first:
+    Return ONLY a JSON array with one object per rule (any order):
     [
       {
-        "rule_id": <int — the id field from the candidate list>,
-        "novelty_score": <int 1-10 using the rubric above>,
-        "policy_score": <int 1-10 using the rubric above>,
-        "reasoning": "<2-3 sentences: name the specific UAE policy phase this relates to, explain why the direction is non-obvious, and quantify the expected lead/lag if applicable>",
-        "policy_recommendation": "<2 concrete sentences: name a specific UAE agency or programme (e.g., NCEMA, WAM, DHA), describe the exact trigger condition, and state the recommended response action>"
+        "rule_id": <int>,
+        "policy_score": <int 1-10>,
+        "reasoning": "<2-3 sentences: name the UAE phase, note whether the direction is operationally interesting, and what it reveals>",
+        "policy_recommendation": "<2 sentences: name a specific UAE agency, the trigger condition, and the recommended action>"
       },
       ...
     ]
@@ -271,106 +218,57 @@ BATCH_SYSTEM_PROMPT = textwrap.dedent("""\
 """)
 
 
-PREDICTIVE_SYSTEM_PROMPT = textwrap.dedent("""\
-    You are an expert data scientist and public health policy advisor reviewing
+ANNOTATE_PREDICTIVE_PROMPT = textwrap.dedent("""\
+    You are an expert data scientist and public health policy advisor annotating
     PREDICTIVE association rules mined from UAE COVID-19 crisis behavior data
-    (March 2020 – December 2021). These rules use lagged or lead features —
-    meaning they describe how today's (or the recent past's) signals forecast
-    future behaviour.
+    (March 2020 – December 2021). These rules use lagged/lead features and
+    describe how today's (or the recent past's) signals forecast future behaviour.
 
-    The dataset combines daily Google Community Mobility metrics with Reddit
-    sentiment signals. Rules were mined using a lagged/lead feature matrix
-    (lags: 1, 3, 7 days; leads: 2, 7 days) and have already passed hard
-    statistical filters (support ≥ 10 %, confidence ≥ 75 %, lift ≥ 1.8).
+    IMPORTANT: These rules have ALREADY been validated by a statistical pipeline
+    and a multi-stage pruning pipeline, and every rule points FORWARD in time.
+    Your job is NOT to select, rank, validate, or reject any rule. You provide
+    ONLY a qualitative annotation for each: a policy-relevance score, a rationale,
+    and a named-agency recommendation. Annotate EVERY rule; omit none.
 
     ── FEATURE SUFFIX CONVENTIONS ────────────────────────────────────────────
-    _lag1, _lag3, _lag7  — feature was active 1/3/7 days AGO
-    _lead2, _lead7       — feature will be active in 2/7 days FROM NOW
-    No suffix            — feature is active TODAY
-
-    Every rule you see has already been validated to point FORWARD in time:
-    the consequent is either a *_lead* feature (a genuine future forecast) or a
-    same-day feature predicted from *_lag* antecedents (the past calling today).
-    You do NOT need to assess or report the lead time — it is computed
-    separately and deterministically from the rule structure. Focus only on
-    NOVELTY and POLICY RELEVANCE.
+    _lag1, _lag3, _lag7 — feature was active 1/3/7 days AGO
+    _lead2, _lead7      — feature will be active in 2/7 days FROM NOW
+    No suffix           — feature is active TODAY
+    You do NOT report lead time; it is computed separately and deterministically.
+    Focus only on POLICY RELEVANCE and the rationale.
     ──────────────────────────────────────────────────────────────────────────
 
     ── UAE COVID-19 POLICY TIMELINE ──────────────────────────────────────────
-    Phase 1 — Onset & first lockdown (Mar–May 2020):
-      Strict stay-home order; nightly curfew; grocery stores exempted;
-      grocery spikes and peak fear sentiment.
-    Phase 2 — Controlled reopening (Jun–Dec 2020):
-      Partial retail/workplace reopening; compliance fatigue; second wave Sep–Oct.
-    Phase 3 — Vaccine rollout & optimism (Jan–Aug 2021):
-      UAE launches one of the world's fastest per-capita vaccine programmes;
-      vaccine_mentioned spikes; positive sentiment recovery.
-    Phase 4 — Endemic transition (Sep–Dec 2021):
-      Most restrictions lifted; mobility returns to baseline; residual
-      health_concern persists in online discourse.
-    ──────────────────────────────────────────────────────────────────────────
-
-    ── NOVELTY SCORING RUBRIC (1–10) ─────────────────────────────────────────
-    Focus specifically on whether the temporal relationship encoded in the rule
-    is useful and non-obvious.
-
-    10 — Cross-domain leading indicator: an emotion/sentiment signal predicts a
-         MOBILITY outcome (or vice versa) with a horizon that would not be
-         obvious from policy dates alone.
-     8–9 — Cross-domain with a clear forward relationship; timing aligns with a
-         known phase transition but the cross-domain direction is non-trivial.
-     6–7 — Within-domain but shows non-trivial temporal persistence or mean
-         reversion (e.g., emotional oscillation, compliance decay).
-     4–5 — Within-domain persistence that is broadly expected (sentiment tends
-         to persist day-over-day, lockdown discourse is sticky).
-     1–3 — Near-tautological: the lag/lead merely restates that a slow-changing
-         variable is still active (e.g., partial_restrictions_lag7 → partial_restrictions).
+    Phase 1 — Onset & first lockdown (Mar–May 2020).
+    Phase 2 — Controlled reopening (Jun–Dec 2020); compliance fatigue.
+    Phase 3 — Vaccine rollout & optimism (Jan–Aug 2021).
+    Phase 4 — Endemic transition (Sep–Dec 2021); residual health_concern.
     ──────────────────────────────────────────────────────────────────────────
 
     ── POLICY RELEVANCE SCORING RUBRIC (1–10) ────────────────────────────────
-    Score on WHETHER a UAE official could use this rule as an EARLY WARNING.
-
-    10 — The trigger is a monitorable today-or-past signal and the consequence
-         is a real-world actionable future outcome.
-         Explicitly names a UAE body (NCEMA, DHA, MoHAP, WAM, etc.) and action.
-     8–9 — Clear forward signal; action is obvious but operationalisation needs
-         one additional step.
-     6–7 — Useful monitoring signal; action requires further validation before
-         deployment.
-     4–5 — Same-domain persistence; gives situational awareness but no new
-         intervention opportunity.
-     1–3 — Consequent is too generic or too slow-changing to drive specific action.
+    Annotation aid only; does NOT determine whether the rule is kept.
+    10 — Monitorable today/past trigger → real-world actionable future outcome;
+         names a UAE body (NCEMA, DHA, MoHAP, WAM) and action.
+     8–9 — Clear forward signal; operationalisation needs one more step.
+     6–7 — Useful monitoring signal; needs further validation.
+     4–5 — Same-domain persistence; situational awareness only.
+     1–3 — Consequent too generic or slow-changing to drive specific action.
     ──────────────────────────────────────────────────────────────────────────
 
-    MANDATORY EXCLUSIONS — do NOT select rules where:
-    - The consequent is a lagged version of a feature already in the antecedent
-      at the same time offset (within-variable persistence artefact).
-    - Both antecedent and consequent are purely within the mobility domain
-      or purely within the sentiment domain AND the rule is same-day or 1-day
-      (too short to be actionable).
-    - The consequent is covid_topic_detected or dominant_emotion_fear
-      (near-constant, ~85 % of days).
-    - MORE THAN 2 rules share the same consequent feature in your top 10.
+    Higher relevance: an emotion/discourse signal predicting a MOBILITY outcome
+    at a 2–7 day lead, or a mobility signal predicting a future discourse shift.
 
-    PREFER rules where:
-    - An EMOTION/DISCOURSE signal today or yesterday PREDICTS a MOBILITY outcome
-      in 2–7 days (the most operationally valuable direction).
-    - A MOBILITY signal predicts a future SENTIMENT or DISCOURSE shift
-      (feedback loop discovery).
-    - The rule captures a phase-transition signal (compliance decay, vaccine
-      optimism, endemic normalisation).
+    IMPORTANT: Return EXACTLY ONE object per input rule, with the same rule_id.
+    The number of objects MUST equal the number of rules provided. Do not omit,
+    filter, deduplicate, or reorder by importance.
 
-    Your task: from the numbered candidate rules below, select and rank the
-    TOP 10 most valuable predictive rules for UAE crisis management.
-
-    Return ONLY a JSON array of exactly 10 objects, ordered best-first:
+    Return ONLY a JSON array with one object per rule (any order):
     [
       {
         "rule_id": <int>,
-        "novelty_score": <int 1-10>,
         "policy_score": <int 1-10>,
-        "reasoning": "<2-3 sentences: name the UAE phase, explain why the temporal direction is non-obvious, state what the forecast enables a decision-maker to do>",
-        "policy_recommendation": "<2 sentences: name a specific UAE agency, state the exact monitoring trigger and the recommended pre-emptive action>"
+        "reasoning": "<2-3 sentences: name the UAE phase, state what the forecast enables a decision-maker to do>",
+        "policy_recommendation": "<2 sentences: name a specific UAE agency, the monitoring trigger, and the pre-emptive action>"
       },
       ...
     ]
@@ -379,32 +277,23 @@ PREDICTIVE_SYSTEM_PROMPT = textwrap.dedent("""\
 
 
 def _build_candidate_block(df: pd.DataFrame) -> str:
-    """Format a DataFrame of candidate rules as a numbered text block for the LLM.
-
-    Annotates each rule with conviction and composite_score when available so
-    the LLM can weight statistical quality alongside domain relevance.
-
-    Any backward-pointing rule (``*_lag`` consequent) that reaches this stage is
-    logged loudly to stderr — it should have been pruned, and feeding it to the
-    LLM would invite a hallucinated forward narrative for a backward pattern.
-    """
+    """Format rules as a numbered text block for the LLM. Backward-pointing rules
+    (a _lag consequent) that somehow reach here are logged to stderr."""
     backward = df[df.apply(
         lambda r: _is_backward_rule(str(r["premise"]), str(r["conclusion"])), axis=1
     )]
     if not backward.empty:
         print(
             f"\n  *** WARNING: {len(backward)} backward-pointing rule(s) with a "
-            f"_lag consequent reached LLM candidate building. These are lookbacks, "
-            f"not forecasts, and should have been pruned. Listing up to 10: ***",
+            f"_lag consequent reached annotation. These are lookbacks, not "
+            f"forecasts, and should have been pruned. ***",
             file=sys.stderr,
         )
-        bcols = [c for c in ["premise", "conclusion", "confidence", "lift"] if c in backward.columns]
-        print(backward[bcols].head(10).to_string(index=False), file=sys.stderr)
 
     lines = []
     for _, row in df.iterrows():
         conviction = row.get("conviction")
-        composite  = row.get("composite_score")
+        composite = row.get("composite_score")
         extras = ""
         if conviction is not None and str(conviction) not in ("nan", "inf", ""):
             try:
@@ -429,147 +318,19 @@ def _build_candidate_block(df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
-def _stratified_candidates(df: pd.DataFrame, candidate_pool: int) -> pd.DataFrame:
-    """
-    Return a stratified candidate pool so the LLM sees diverse rule types.
-
-    Split the pool evenly between:
-    - Rules whose conclusion is a SOCIAL/EMOTION feature (mobility → emotion direction)
-    - Rules whose conclusion is a MOBILITY feature (emotion → mobility direction)
-
-    Within each stratum, sort by lift descending. Lag/lead suffixes are stripped
-    before checking whether a conclusion is a mobility feature.
-    """
-    def _base(f: str) -> str:
-        return re.sub(r"_(lag|lead)\d+$", "", str(f).strip())
-
-    mob = MOBILITY_FEATURES
-    half = candidate_pool // 2
-
-    conc_is_mob = df["conclusion"].apply(lambda c: _base(c) in mob)
-
-    social_conclusion = (
-        df[df["cross_domain"] & ~conc_is_mob]
-        .sort_values(["lift", "confidence"], ascending=False)
-        .head(half)
-    )
-    mob_conclusion = (
-        df[df["cross_domain"] & conc_is_mob]
-        .sort_values(["lift", "confidence"], ascending=False)
-        .head(half)
-    )
-    # Fill any shortfall in one stratum from the other
-    combined = pd.concat([social_conclusion, mob_conclusion]).drop_duplicates()
-    if len(combined) < candidate_pool:
-        remaining = df[~df.index.isin(combined.index)].sort_values(
-            ["lift", "confidence"], ascending=False
-        ).head(candidate_pool - len(combined))
-        combined = pd.concat([combined, remaining])
-    return combined.head(candidate_pool)
-
-
-# ============================================================================
-# ADDITION 1 — new prompt: score ALL predictive rules, drop none.
-# Place this near PREDICTIVE_SYSTEM_PROMPT.
-# ============================================================================
-
-SCORE_ALL_PREDICTIVE_PROMPT = textwrap.dedent("""\
-    You are an expert data scientist and public health policy advisor reviewing
-    PREDICTIVE association rules mined from UAE COVID-19 crisis behavior data
-    (March 2020 – December 2021). These rules use lagged or lead features —
-    they describe how today's (or the recent past's) signals forecast future
-    behaviour.
-
-    The dataset combines daily Google Community Mobility metrics with Reddit
-    sentiment signals. Rules were mined using a lagged/lead feature matrix
-    (lags: 1, 3, 7 days; leads: 2, 7 days) and have ALREADY passed hard
-    statistical filters and a multi-stage pruning pipeline. Every rule shown is
-    statistically valid and points FORWARD in time.
-
-    ── FEATURE SUFFIX CONVENTIONS ────────────────────────────────────────────
-    _lag1, _lag3, _lag7  — feature was active 1/3/7 days AGO
-    _lead2, _lead7       — feature will be active in 2/7 days FROM NOW
-    No suffix            — feature is active TODAY
-    You do NOT report lead time; it is computed separately and deterministically.
-    Focus ONLY on NOVELTY and POLICY RELEVANCE.
-    ──────────────────────────────────────────────────────────────────────────
-
-    ── UAE COVID-19 POLICY TIMELINE ──────────────────────────────────────────
-    Phase 1 — Onset & first lockdown (Mar–May 2020): strict stay-home; curfew;
-      grocery stores exempted; grocery spikes; peak fear sentiment.
-    Phase 2 — Controlled reopening (Jun–Dec 2020): partial retail/workplace
-      reopening; compliance fatigue; second wave Sep–Oct.
-    Phase 3 — Vaccine rollout & optimism (Jan–Aug 2021): fast per-capita vaccine
-      programme; vaccine_mentioned spikes; positive sentiment recovery.
-    Phase 4 — Endemic transition (Sep–Dec 2021): restrictions lifted; mobility
-      returns to baseline; residual health_concern persists in discourse.
-    ──────────────────────────────────────────────────────────────────────────
-
-    ── NOVELTY SCORING RUBRIC (1–10) ─────────────────────────────────────────
-    10 — Cross-domain leading indicator: emotion/sentiment predicts a MOBILITY
-         outcome (or vice versa) with a non-obvious horizon.
-     8–9 — Cross-domain forward relationship; timing aligns with a known phase
-         transition but the cross-domain direction is non-trivial.
-     6–7 — Within-domain but non-trivial temporal persistence or mean reversion.
-     4–5 — Within-domain persistence that is broadly expected.
-     1–3 — Near-tautological (a slow-changing variable restating itself).
-
-    ── POLICY RELEVANCE SCORING RUBRIC (1–10) ────────────────────────────────
-    10 — Monitorable today/past trigger → real-world actionable future outcome;
-         names a UAE body (NCEMA, DHA, MoHAP, WAM) and action.
-     8–9 — Clear forward signal; operationalisation needs one more step.
-     6–7 — Useful monitoring signal; needs further validation.
-     4–5 — Same-domain persistence; situational awareness only.
-     1–3 — Consequent too generic or slow-changing to drive specific action.
-    ──────────────────────────────────────────────────────────────────────────
-
-    SCORING GUIDANCE (these LOWER a score — they do NOT remove the rule):
-    - Within-domain persistence (sentiment→sentiment, mobility→mobility) → score
-      novelty in the 4–5 band, not above.
-    - Consequent is near-constant (covid_topic_detected, dominant_emotion_fear,
-      ~85% of days) → policy 1–3.
-    - Rule restates a slow-changing variable → novelty 1–3.
-    Higher scores go to: emotion/discourse → mobility forecasts at 2–7 day lead;
-    mobility → sentiment feedback loops; phase-transition signals.
-
-    IMPORTANT: Score EVERY rule in the list below. Do NOT omit, filter, or
-    deduplicate. Return EXACTLY ONE object per input rule, with the same rule_id.
-    The number of objects you return MUST equal the number of rules provided.
-
-    Return ONLY a JSON array with one object per rule (any order):
-    [
-      {
-        "rule_id": <int — the id from the candidate list>,
-        "novelty_score": <int 1-10>,
-        "policy_score": <int 1-10>,
-        "reasoning": "<2-3 sentences: name the UAE phase, explain why the temporal direction is or is not non-obvious, state what the forecast enables>",
-        "policy_recommendation": "<2 sentences: name a specific UAE agency, the monitoring trigger, and the pre-emptive action>"
-      },
-      ...
-    ]
-    No markdown fences. No extra text. Valid JSON only.
-""")
-
-
-# ============================================================================
-# ADDITION 2 — new function: score ALL rules, annotate every row, drop none.
-# Place this next to select_top_rules_with_llm().
-# ============================================================================
-
-def score_all_rules_with_llm(
+def annotate_all_rules_with_llm(
     df: pd.DataFrame,
     model: str = "gpt-4o-mini",
     system_prompt: str | None = None,
 ) -> pd.DataFrame:
-    """Score EVERY rule in df with the LLM (novelty + policy), dropping none.
+    """Annotate EVERY rule with the LLM (policy relevance + rationale), dropping none.
 
-    Unlike select_top_rules_with_llm (which assigns scores only to a top-k the
-    model picks), this annotates all rows. Ranking happens afterward as a sort,
-    so a low-scored but statistically valid rule is retained, not filtered.
+    This is an annotation layer, not a selection or ranking step. Rule validity is
+    established upstream by the statistical pipeline. Every rule is annotated;
+    nothing is filtered. Output ordering is statistical, set by the caller.
 
-    Adds columns: novelty_score, policy_score, llm_reasoning,
-    llm_policy_recommendation, lead_time_days, llm_composite, llm_rank
-    (llm_rank here is a post-hoc rank by llm_composite, for display only).
+    Adds columns: policy_score, llm_reasoning, llm_policy_recommendation,
+    lead_time_days. Does NOT add any novelty score or llm_rank.
     """
     try:
         from openai import OpenAI  # noqa: PLC0415
@@ -587,16 +348,15 @@ def score_all_rules_with_llm(
     df = df.copy().reset_index(drop=True)
     df["rule_id"] = df.index
 
-    # Send ALL rules — no stratified subset, no candidate cap.
     candidate_block = _build_candidate_block(df)
     n = len(df)
     user_msg = (
-        f"Score ALL {n} of the following rules. Return exactly {n} objects, "
-        f"one per rule_id:\n\n" + candidate_block
+        f"Annotate ALL {n} of the following validated rules. Return exactly {n} "
+        f"objects, one per rule_id:\n\n" + candidate_block
     )
 
-    print(f"  Sending ALL {n} rules to LLM for full scoring ...")
-    active_prompt = system_prompt if system_prompt is not None else SCORE_ALL_PREDICTIVE_PROMPT
+    print(f"  Sending ALL {n} rules to LLM for annotation ...")
+    active_prompt = system_prompt if system_prompt is not None else ANNOTATE_SAMEDAY_PROMPT
     response = client.chat.completions.create(
         model=model,
         messages=[
@@ -604,21 +364,25 @@ def score_all_rules_with_llm(
             {"role": "user", "content": user_msg},
         ],
         temperature=0.2,
-        max_tokens=4000,  # higher: one object per rule, not just top-k
+        max_tokens=4000,
     )
 
     raw = response.choices[0].message.content.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```", 2)[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+        raw = raw.strip()
     try:
-        scored = json.loads(raw)
+        annotations = json.loads(raw)
     except json.JSONDecodeError:
         print(f"WARNING: LLM returned non-JSON:\n{raw}", file=sys.stderr)
-        print("Falling back to statistical ranking (no LLM scores).", file=sys.stderr)
+        print("Proceeding with statistical ordering and no annotations.", file=sys.stderr)
         return df
-    if not isinstance(scored, list):
-        print("WARNING: LLM response not a JSON array; skipping LLM scores.", file=sys.stderr)
+    if not isinstance(annotations, list):
+        print("WARNING: LLM response not a JSON array; skipping annotations.", file=sys.stderr)
         return df
 
-    df["novelty_score"] = None
     df["policy_score"] = None
     df["llm_reasoning"] = ""
     df["llm_policy_recommendation"] = ""
@@ -626,12 +390,11 @@ def score_all_rules_with_llm(
 
     valid_ids = set(df["rule_id"].tolist())
     seen = set()
-    for entry in scored:
+    for entry in annotations:
         rid = entry.get("rule_id")
         if rid not in valid_ids:
             continue
         idx = df.index[df["rule_id"] == rid][0]
-        df.at[idx, "novelty_score"] = entry.get("novelty_score")
         df.at[idx, "policy_score"] = entry.get("policy_score")
         df.at[idx, "llm_reasoning"] = entry.get("reasoning", "")
         df.at[idx, "llm_policy_recommendation"] = entry.get("policy_recommendation", "")
@@ -643,155 +406,47 @@ def score_all_rules_with_llm(
     missing = valid_ids - seen
     if missing:
         print(
-            f"  WARNING: LLM did not score {len(missing)} rule(s): ids {sorted(missing)}. "
-            f"They are retained with null scores and sorted last.",
+            f"  WARNING: LLM did not annotate {len(missing)} rule(s): ids {sorted(missing)}. "
+            f"They are retained with null annotation.",
             file=sys.stderr,
         )
 
-    df["llm_composite"] = df[["novelty_score", "policy_score"]].mean(axis=1)
-    # Post-hoc display rank by composite (NOT a filter — every row keeps its data)
-    df["llm_rank"] = (
-        df["llm_composite"].rank(ascending=False, method="first").astype("Int64")
-    )
-
-    print(f"  LLM scored {df['novelty_score'].notna().sum()} / {n} rules.")
+    print(f"  LLM annotated {df['policy_score'].notna().sum()} / {n} rules.")
     return df
 
 
-def select_top_rules_with_llm(
-    df: pd.DataFrame,
-    model: str = "gpt-4o-mini",
-    candidate_pool: int = CANDIDATE_POOL,
-    top_n: int = TOP_N_LLM,
-    system_prompt: str | None = None,
-) -> pd.DataFrame:
-    """
-    Send the top `candidate_pool` rules to the LLM in a single batch call and
-    ask it to select the `top_n` most novel and policy-relevant ones.
-
-    Returns the full df with new columns on the selected rows:
-      novelty_score, policy_score, llm_reasoning, llm_policy_recommendation,
-      llm_rank, lead_time_days (computed deterministically), llm_composite.
-    The returned df is sorted so the LLM-selected top rules appear first (in LLM rank
-    order), followed by the remaining rules.
-    """
-    try:
-        from openai import OpenAI  # noqa: PLC0415
-    except ImportError:
-        print("ERROR: openai package not installed.  Run: pip install openai", file=sys.stderr)
-        sys.exit(1)
-
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        print(
-            "ERROR: OPENAI_API_KEY not found. Add it to .env or set it as an environment variable.",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    client = OpenAI(api_key=api_key)
-
-    # Assign stable integer IDs so LLM can reference them
-    df = df.copy().reset_index(drop=True)
-    df["rule_id"] = df.index
-
-    # Pre-sort: use stratified selection so LLM sees both directions of cross-domain rules
-    candidates = _stratified_candidates(df, candidate_pool)
-
-    candidate_block = _build_candidate_block(candidates)
-    user_msg = (
-        f"Select the top {top_n} rules from these {len(candidates)} candidates:\n\n"
-        + candidate_block
-    )
-
-    print(f"  Sending {len(candidates)} candidate rules to LLM for batch selection ...")
-    active_prompt = system_prompt if system_prompt is not None else BATCH_SYSTEM_PROMPT
-    response = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": active_prompt},
-            {"role": "user", "content": user_msg},
-        ],
-        temperature=0.2,
-        max_tokens=2400,
-    )
-
-    raw = response.choices[0].message.content.strip()
-    try:
-        selections = json.loads(raw)
-    except json.JSONDecodeError:
-        print(f"WARNING: LLM returned non-JSON response:\n{raw}", file=sys.stderr)
-        print("Falling back to statistical ranking.", file=sys.stderr)
-        return df
-
-    if not isinstance(selections, list):
-        print("WARNING: LLM response was not a JSON array; falling back to statistical ranking.",
-              file=sys.stderr)
-        return df
-
-    # Initialise score columns
-    df["novelty_score"] = None
-    df["policy_score"] = None
-    df["llm_reasoning"] = ""
-    df["llm_policy_recommendation"] = ""
-    df["llm_rank"] = None
-    df["lead_time_days"] = None
-
-    valid_ids = set(df["rule_id"].tolist())
-    for rank, entry in enumerate(selections[:top_n], start=1):
-        rid = entry.get("rule_id")
-        if rid not in valid_ids:
-            continue
-        idx = df.index[df["rule_id"] == rid][0]
-        df.at[idx, "novelty_score"] = entry.get("novelty_score")
-        df.at[idx, "policy_score"] = entry.get("policy_score")
-        df.at[idx, "llm_reasoning"] = entry.get("reasoning", "")
-        df.at[idx, "llm_policy_recommendation"] = entry.get("policy_recommendation", "")
-        df.at[idx, "llm_rank"] = rank
-        # Lead time is derived from the rule structure, never from the LLM.
-        df.at[idx, "lead_time_days"] = compute_lead_time_days(
-            str(df.at[idx, "premise"]), str(df.at[idx, "conclusion"])
-        )
-
-    df["llm_composite"] = df[["novelty_score", "policy_score"]].mean(axis=1)
-
-    print(f"  LLM selected {df['llm_rank'].notna().sum()} rules.")
-    return df
+def _statistical_order(df: pd.DataFrame) -> pd.DataFrame:
+    """Order rules by objective statistics only. Prefers the pipeline's
+    composite_score when present, else cross-domain → lift → confidence.
+    The LLM never influences ordering."""
+    if "composite_score" in df.columns and df["composite_score"].notna().any():
+        return df.sort_values("composite_score", ascending=False).reset_index(drop=True)
+    sort_cols = [c for c in ["cross_domain", "lift", "confidence", "support"] if c in df.columns]
+    return df.sort_values(sort_cols, ascending=[False] * len(sort_cols)).reset_index(drop=True)
 
 
 # ---------------------------------------------------------------------------
-# Human-readable summary writer
+# Human-readable summary writers
 # ---------------------------------------------------------------------------
 
-def write_summary(df: pd.DataFrame, out_path: Path, top_n: int = 10) -> None:
-    """Write a text summary of the top rules.
+def write_summary(df: pd.DataFrame, out_path: Path, top_n: int | None = None) -> None:
+    """Write a text summary of same-day rules, ordered by statistics.
 
-    If the df contains an 'llm_rank' column (set by the LLM batch selection),
-    the LLM-selected top-10 are shown in LLM rank order.  Otherwise rules are
-    ranked statistically (cross-domain first, then lift).
+    Inclusion and order are statistical. If the LLM annotation step ran, each
+    rule additionally shows a policy annotation — but the LLM never ranks/selects.
     """
     out_path.parent.mkdir(parents=True, exist_ok=True)
+    annotated = "policy_score" in df.columns and df["policy_score"].notna().any()
 
-    llm_selected = "llm_rank" in df.columns and df["llm_rank"].notna().any()
-
-    if llm_selected:
-        # Show only the LLM-selected rules in their chosen order
-        ranked = (
-            df[df["llm_rank"].notna()]
-            .sort_values("llm_rank")
-            .head(top_n)
-        )
-        header_note = f"  LLM-SELECTED: Top {top_n} Most Novel & Policy-Relevant Rules\n"
-    else:
-        sort_cols = ["cross_domain", "lift", "confidence"]
-        ranked = df.sort_values(sort_cols, ascending=[False, False, False]).head(top_n)
-        header_note = f"  Top {top_n} Rules by Statistical Ranking (cross-domain priority)\n"
+    ranked = _statistical_order(df)
+    if top_n is not None:
+        ranked = ranked.head(top_n)
 
     with open(out_path, "w") as f:
         f.write("=" * 72 + "\n")
         f.write("  TOP RULES — CROSS-DOMAIN MOBILITY × EMOTION ANALYSIS\n")
         f.write("  UAE COVID-19 PERIOD\n")
-        f.write(header_note)
+        f.write("  Ordered by statistics; LLM provides policy annotation only.\n")
         f.write("=" * 72 + "\n\n")
 
         for i, (_, rule) in enumerate(ranked.iterrows(), start=1):
@@ -802,43 +457,35 @@ def write_summary(df: pd.DataFrame, out_path: Path, top_n: int = 10) -> None:
                 f"  Support: {int(rule['support'])} days ({float(rule['support_pct']):.1f}%)  "
                 f"Confidence: {float(rule['confidence']):.1f}%  Lift: {float(rule['lift']):.2f}\n"
             )
-            if llm_selected and pd.notna(rule.get("llm_composite")):
-                f.write(
-                    f"  LLM: novelty={rule['novelty_score']}/10  "
-                    f"policy_relevance={rule['policy_score']}/10\n"
-                )
-                if rule.get("llm_reasoning"):
-                    f.write(f"  Why it matters: {rule['llm_reasoning']}\n")
-                if rule.get("llm_policy_recommendation"):
-                    f.write(f"  Policy recommendation: {rule['llm_policy_recommendation']}\n")
+            if annotated and pd.notna(rule.get("policy_score")):
+                f.write(f"  Policy relevance (LLM annotation): {int(rule['policy_score'])}/10\n")
+                reasoning = rule.get("llm_reasoning", "")
+                if reasoning and str(reasoning).strip() not in ("", "nan"):
+                    f.write(f"  Insight: {reasoning}\n")
+                rec = rule.get("llm_policy_recommendation", "")
+                if rec and str(rec).strip() not in ("", "nan"):
+                    f.write(f"  Recommendation: {rec}\n")
             f.write("\n")
 
     print(f"Summary written to {out_path}")
 
 
-# ---------------------------------------------------------------------------
-# Predictive rules human-readable summary
-# ---------------------------------------------------------------------------
-
 def _write_predictive_summary(df: pd.DataFrame, out_path: Path, top_n: int | None = None) -> None:
-    """Write a human-readable text summary of the LLM-evaluated predictive rules."""
+    """Write a human-readable summary of predictive rules, ordered by statistics."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    llm_selected = "llm_rank" in df.columns and df["llm_rank"].notna().any()
-    if llm_selected:
-        ranked = df[df["llm_rank"].notna()].sort_values("llm_rank")
-    else:
-        ranked = df.sort_values("lift", ascending=False)
+    annotated = "policy_score" in df.columns and df["policy_score"].notna().any()
+
+    ranked = _statistical_order(df)
     if top_n is not None:
         ranked = ranked.head(top_n)
+
     with open(out_path, "w") as f:
         f.write("=" * 72 + "\n")
         f.write("  TOP PREDICTIVE RULES — TEMPORAL FORECASTING SIGNALS\n")
         f.write("  UAE COVID-19 PERIOD (March 2020 – December 2021)\n")
-        f.write("  LLM-EVALUATED with lead-time and policy recommendations\n")
+        f.write("  Ordered by statistics; LLM provides policy annotation only.\n")
         f.write("=" * 72 + "\n\n")
         for i, (_, rule) in enumerate(ranked.iterrows(), start=1):
-            # Lead time is recomputed here too, so the summary never depends on a
-            # possibly-missing column or an LLM-supplied value.
             lead = compute_lead_time_days(str(rule["premise"]), str(rule["conclusion"]))
             lead_str = f"  Lead time: {int(lead)} days\n" if lead else "  Lead time: same-day\n"
             f.write(f"Predictive Rule {i}:\n")
@@ -849,16 +496,15 @@ def _write_predictive_summary(df: pd.DataFrame, out_path: Path, top_n: int | Non
                 f"Confidence: {float(rule['confidence']):.1f}%  "
                 f"Lift: {float(rule['lift']):.2f}\n"
             )
-            if llm_selected and pd.notna(rule.get("llm_rank")):
-                f.write(
-                    f"  LLM: novelty={rule['novelty_score']}/10  "
-                    f"policy_relevance={rule['policy_score']}/10\n"
-                )
-                f.write(lead_str)
-                if rule.get("llm_reasoning"):
-                    f.write(f"  Why it matters: {rule['llm_reasoning']}\n")
-                if rule.get("llm_policy_recommendation"):
-                    f.write(f"  Policy recommendation: {rule['llm_policy_recommendation']}\n")
+            f.write(lead_str)
+            if annotated and pd.notna(rule.get("policy_score")):
+                f.write(f"  Policy relevance (LLM annotation): {int(rule['policy_score'])}/10\n")
+                reasoning = rule.get("llm_reasoning", "")
+                if reasoning and str(reasoning).strip() not in ("", "nan"):
+                    f.write(f"  Insight: {reasoning}\n")
+                rec = rule.get("llm_policy_recommendation", "")
+                if rec and str(rec).strip() not in ("", "nan"):
+                    f.write(f"  Recommendation: {rec}\n")
             f.write("\n")
     print(f"Predictive summary written to {out_path}")
 
@@ -870,22 +516,25 @@ def _write_predictive_summary(df: pd.DataFrame, out_path: Path, top_n: int | Non
 def main() -> None:
     _load_env()
 
-    parser = argparse.ArgumentParser(description="Evaluate FCA rules with optional LLM scoring.")
+    parser = argparse.ArgumentParser(
+        description="Annotate FCA rules with optional LLM policy commentary (no selection/ranking)."
+    )
     parser.add_argument(
         "--llm",
         action="store_true",
-        help="Enable LLM scoring via OpenAI API (requires OPENAI_API_KEY).",
+        help="Enable LLM annotation via OpenAI API (requires OPENAI_API_KEY).",
     )
     parser.add_argument(
         "--model",
         default="gpt-4o-mini",
-        help="OpenAI model to use for scoring (default: gpt-4o-mini).",
+        help="OpenAI model to use (default: gpt-4o-mini).",
     )
     parser.add_argument(
         "--top-n",
         type=int,
-        default=TOP_N_LLM,
-        help=f"Number of top rules to select and include in the text summary (default: {TOP_N_LLM}).",
+        default=None,
+        help="Optionally limit the text summary to the top-N rules by statistics "
+             "(default: show all).",
     )
     args = parser.parse_args()
 
@@ -900,11 +549,11 @@ def main() -> None:
     df = pd.read_csv(RULES_FILE)
     print(f"Loaded {len(df)} rules from {RULES_FILE}")
 
-    # Refresh / add cross_domain tag (handles files produced before this script existed)
     df = tag_cross_domain(df)
 
     # ------------------------------------------------------------------
-    # Step 1: Prune with hard gates + redundancy removal
+    # Step 1: Prune with hard gates + redundancy removal, then score.
+    # This is where rule VALIDITY is established — not the LLM.
     # ------------------------------------------------------------------
     try:
         import importlib.util as _ilu
@@ -919,8 +568,7 @@ def main() -> None:
         binary_matrix_path = PROJECT_ROOT / "data" / "processed" / "fca_binary_matrix.csv"
         prevalence_map: dict = {}
         if binary_matrix_path.exists():
-            import pandas as _pd  # noqa: PLC0415
-            bm = _pd.read_csv(binary_matrix_path)
+            bm = pd.read_csv(binary_matrix_path)
             prevalence_map = build_prevalence_map(bm)
 
         print(f"\n--- Pruning pass (before: {len(df)} rules) ---")
@@ -937,56 +585,42 @@ def main() -> None:
     print(f"\n  Cross-domain rules (mobility × emotion): {n_cross}")
     print(f"  Single-domain rules: {len(df) - n_cross}")
 
+    # ------------------------------------------------------------------
+    # Step 2 (optional): LLM ANNOTATION of the validated same-day rules.
+    # ------------------------------------------------------------------
     if args.llm:
-        print(f"\nRunning LLM batch selection with model '{args.model}' ...")
-        df = select_top_rules_with_llm(df, model=args.model, top_n=args.top_n)
+        print(f"\nAnnotating ALL {len(df)} validated same-day rules with '{args.model}' ...")
+        df = annotate_all_rules_with_llm(df, model=args.model, system_prompt=ANNOTATE_SAMEDAY_PROMPT)
 
-    # Final sort: LLM-ranked rows first, then composite_score (if present), then lift
-    if "llm_rank" in df.columns and df["llm_rank"].notna().any():
-        sort_by = ["llm_rank"]
-        sort_asc = [True]
-        if "composite_score" in df.columns:
-            sort_by.append("composite_score")
-            sort_asc.append(False)
-        sort_by.append("lift")
-        sort_asc.append(False)
-        df = df.sort_values(sort_by, ascending=sort_asc, na_position="last").reset_index(drop=True)
-    elif "composite_score" in df.columns:
-        df = df.sort_values("composite_score", ascending=False).reset_index(drop=True)
-    else:
-        df = df.sort_values(
-            ["cross_domain", "lift", "confidence", "support"],
-            ascending=[False, False, False, False],
-        ).reset_index(drop=True)
+    # Always store in statistical order — the LLM never reorders.
+    df = _statistical_order(df)
 
     OUT_CSV.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT_CSV, index=False)
-    print(f"\nEvaluated rules saved to {OUT_CSV}")
+    print(f"\nEvaluated (annotated) rules saved to {OUT_CSV}")
 
     write_summary(df, OUT_TXT, top_n=args.top_n)
 
-    # Also write structured policy briefs if module available
+    # Structured policy briefs if module available
     try:
         from src.reporting.policy_briefs import generate_policy_briefs  # noqa: PLC0415
         briefs_path = PROJECT_ROOT / "results" / "policy_briefs.txt"
         generate_policy_briefs(df, top_n=args.top_n, output_path=briefs_path)
-    except ImportError:
+    except (ImportError, TypeError):
         pass
 
     # ------------------------------------------------------------------
-    # Step 4 (optional): LLM evaluation of PREDICTIVE rules
+    # Step 3 (optional): LLM ANNOTATION of PREDICTIVE rules.
     # ------------------------------------------------------------------
     if args.llm and PRED_RULES_FILE.exists():
         print(f"\n{'='*60}")
-        print("PREDICTIVE RULES — LLM evaluation")
+        print("PREDICTIVE RULES — LLM annotation")
         print(f"{'='*60}")
         pred_df = pd.read_csv(PRED_RULES_FILE)
         print(f"Loaded {len(pred_df)} predictive rules from {PRED_RULES_FILE.name}")
 
-        # Refresh cross_domain so suffixed features resolve to their base domain
         pred_df = tag_cross_domain(pred_df)
 
-        # Score predictive rules statistically if not already done
         if "composite_score" not in pred_df.columns:
             try:
                 from src.scoring.score_rules import score_rules  # noqa: PLC0415
@@ -994,37 +628,29 @@ def main() -> None:
             except ImportError:
                 pass
 
-        print(f"\nScoring ALL {len(pred_df)} predictive rules (no top-k filter) ...")
-        pred_df = score_all_rules_with_llm(
+        print(f"\nAnnotating ALL {len(pred_df)} predictive rules ...")
+        pred_df = annotate_all_rules_with_llm(
             pred_df,
             model=args.model,
-            system_prompt=SCORE_ALL_PREDICTIVE_PROMPT,
+            system_prompt=ANNOTATE_PREDICTIVE_PROMPT,
         )
 
-        # Sort: LLM-ranked first, then composite_score
-        if pred_df["llm_rank"].notna().any():
-            sort_by = ["llm_rank"]
-            sort_asc = [True]
-            if "composite_score" in pred_df.columns:
-                sort_by.append("composite_score")
-                sort_asc.append(False)
-            pred_df = pred_df.sort_values(sort_by, ascending=sort_asc, na_position="last").reset_index(drop=True)
+        pred_df = _statistical_order(pred_df)
 
         OUT_PRED_CSV.parent.mkdir(parents=True, exist_ok=True)
         pred_df.to_csv(OUT_PRED_CSV, index=False)
-        print(f"Predictive rules evaluated and saved to {OUT_PRED_CSV}")
+        print(f"Predictive rules annotated and saved to {OUT_PRED_CSV}")
 
-        _write_predictive_summary(pred_df, OUT_PRED_TXT)
+        _write_predictive_summary(pred_df, OUT_PRED_TXT, top_n=args.top_n)
     elif args.llm:
-        print(f"\nNOTE: Predictive rules file not found at {PRED_RULES_FILE}; skipping predictive LLM step.")
+        print(f"\nNOTE: Predictive rules file not found at {PRED_RULES_FILE}; skipping predictive step.")
 
-    # Print a quick preview
-    print("\nTop 10 rules after evaluation:")
+    # Quick preview
+    print("\nRules after annotation (statistical order):")
     preview_cols = [c for c in [
         "premise", "conclusion", "cross_domain", "composite_score", "lift", "confidence",
+        "policy_score",
     ] if c in df.columns]
-    if "llm_composite" in df.columns:
-        preview_cols.append("llm_composite")
     print(df[preview_cols].head(10).to_string(index=False))
 
 

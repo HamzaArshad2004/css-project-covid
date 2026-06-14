@@ -1,70 +1,70 @@
 ========================================================================
   TOP RULES — CROSS-DOMAIN MOBILITY × EMOTION ANALYSIS
   UAE COVID-19 PERIOD
-  LLM-SELECTED: Top 20 Most Novel & Policy-Relevant Rules
+  Ordered by statistics; LLM provides policy annotation only.
 ========================================================================
 
 Rule 1:  [CROSS-DOMAIN] 
   IF:   grocery_spike, high_positive_sentiment
   THEN: calm_mobile_baseline
   Support: 103 days (15.4%)  Confidence: 85.4%  Lift: 2.16
-  LLM: novelty=8/10  policy_relevance=7/10
-  Why it matters: This rule relates to Phase 3, where high positive sentiment and grocery spikes are expected to stabilize mobility. The non-obvious direction is that positive sentiment and grocery spikes lead to a calm mobile baseline, suggesting a potential for complacency despite ongoing health concerns.
-  Policy recommendation: NCEMA should monitor the combination of grocery spikes and high positive sentiment. If both are observed, consider reinforcing public health messaging to maintain vigilance.
+  Policy relevance (LLM annotation): 8/10
+  Insight: This rule relates to Phase 4, where a calm mobile baseline indicates a return to normalcy. The operational direction suggests that positive sentiment and grocery spikes can stabilize mobility patterns.
+  Recommendation: The National Emergency Crisis and Disaster Management Authority (NCEMA) should monitor grocery trends and positive sentiment as triggers to assess public readiness for further easing of restrictions.
 
 Rule 2:  [CROSS-DOMAIN] 
   IF:   grocery_spike, vaccine_mentioned
   THEN: calm_mobile_baseline
   Support: 176 days (26.2%)  Confidence: 79.5%  Lift: 2.01
-  LLM: novelty=8/10  policy_relevance=6/10
-  Why it matters: This rule also pertains to Phase 3, where vaccine mentions are expected to correlate with mobility stabilization. The unexpected aspect is that the combination of grocery spikes and vaccine mentions leads to a calm mobile baseline, indicating a potential disconnect between vaccination progress and mobility behavior.
-  Policy recommendation: DHA should track grocery spikes alongside vaccine mentions. If both conditions are met, initiate community outreach to ensure continued adherence to health guidelines despite mobility normalization.
+  Policy relevance (LLM annotation): 8/10
+  Insight: Also linked to Phase 4, this rule indicates that the mention of vaccines alongside grocery spikes can lead to a calm mobile baseline. This suggests a positive public response to vaccination efforts.
+  Recommendation: The Department of Health Abu Dhabi (DHA) should use grocery spikes and vaccine mentions as indicators to promote vaccination campaigns and public health messaging.
 
 Rule 3:  [CROSS-DOMAIN] 
   IF:   health_concern, calm_mobile_baseline
   THEN: grocery_spike
   Support: 137 days (20.4%)  Confidence: 77.4%  Lift: 1.82
-  LLM: novelty=7/10  policy_relevance=6/10
-  Why it matters: This rule connects health concern with grocery spikes during Phase 4, where mobility is recovering. The unexpected direction is that ongoing health concerns can still drive grocery spikes, indicating that public anxiety may persist even as mobility increases.
-  Policy recommendation: WAM should monitor health concerns in conjunction with grocery spikes. If health concerns remain high while grocery spikes occur, consider targeted communication to address public anxiety.
+  Policy relevance (LLM annotation): 7/10
+  Insight: This rule is relevant to Phase 3, where health concerns are still prevalent. It shows that a calm mobile baseline can lead to increased grocery spikes, indicating a potential shift in consumer behavior.
+  Recommendation: The Ministry of Health and Prevention (MoHAP) should track health concern levels and mobile baselines to anticipate changes in grocery demand and adjust supply chain strategies accordingly.
 
 Rule 4:  [CROSS-DOMAIN] 
-  IF:   grocery_spike, sentiment_improved
-  THEN: high_positive_sentiment
-  Support: 82 days (12.2%)  Confidence: 75.6%  Lift: 1.97
-  LLM: novelty=6/10  policy_relevance=5/10
-  Why it matters: This rule suggests that improved sentiment leads to high positive sentiment during Phase 3. While this is plausible, the direction is not trivial as it indicates a feedback loop where sentiment improvement is necessary for sustained positivity.
-  Policy recommendation: NCEMA should evaluate sentiment trends regularly. If sentiment improves significantly, consider reinforcing positive messaging to maintain the upward trend.
-
-Rule 5:  [CROSS-DOMAIN] 
   IF:   residential_increase, sentiment_improved
   THEN: high_positive_sentiment
   Support: 92 days (13.7%)  Confidence: 75.0%  Lift: 1.95
-  LLM: novelty=5/10  policy_relevance=4/10
-  Why it matters: This rule indicates that residential increases and improved sentiment lead to high positive sentiment during Phase 4. The correlation is expected but highlights the importance of residential behavior in shaping public sentiment.
-  Policy recommendation: DHA should assess residential trends alongside sentiment data. If residential increases coincide with sentiment improvements, consider community engagement strategies to sustain positive sentiment.
+  Policy relevance (LLM annotation): 6/10
+  Insight: This rule pertains to Phase 4, suggesting that an increase in residential mobility and improved sentiment can lead to high positive sentiment. It highlights the interconnectedness of mobility and emotional well-being.
+  Recommendation: The UAE government should monitor residential mobility and sentiment improvements to gauge community morale and readiness for further policy adjustments.
+
+Rule 5:  [CROSS-DOMAIN] 
+  IF:   grocery_spike, sentiment_improved
+  THEN: high_positive_sentiment
+  Support: 82 days (12.2%)  Confidence: 75.6%  Lift: 1.97
+  Policy relevance (LLM annotation): 6/10
+  Insight: Also relevant to Phase 4, this rule indicates that grocery spikes combined with improved sentiment can lead to high positive sentiment. This reflects consumer confidence in the market.
+  Recommendation: The UAE's Ministry of Economy should analyze grocery trends and sentiment improvements to inform economic recovery strategies and support local businesses.
 
 Rule 6:  
-  IF:   grocery_spike, weekend
-  THEN: calm_mobile_baseline
-  Support: 82 days (12.2%)  Confidence: 87.8%  Lift: 2.21
-  LLM: novelty=4/10  policy_relevance=3/10
-  Why it matters: This rule connects grocery spikes with weekends leading to a calm mobile baseline. While it reflects expected behavior, the timing aligns with typical weekend patterns, making it less novel.
-  Policy recommendation: NCEMA should monitor grocery spikes on weekends. If spikes are observed, consider adjusting resource allocation for public health messaging during peak shopping times.
-
-Rule 7:  
   IF:   calm_mobile_baseline
   THEN: grocery_spike
   Support: 266 days (39.6%)  Confidence: 83.8%  Lift: 1.97
-  LLM: novelty=3/10  policy_relevance=2/10
-  Why it matters: This rule indicates that a calm mobile baseline leads to grocery spikes, which is a tautological relationship. The direction is expected and does not provide new insights.
-  Policy recommendation: No specific action is recommended as this rule does not provide actionable insights.
+  Policy relevance (LLM annotation): 7/10
+  Insight: This rule is associated with Phase 4, indicating that a calm mobile baseline can lead to grocery spikes. It suggests that stability in mobility can drive consumer behavior.
+  Recommendation: The NCEMA should monitor mobile baselines to anticipate grocery demand fluctuations and ensure adequate supply chain management.
+
+Rule 7:  
+  IF:   grocery_spike, weekend
+  THEN: calm_mobile_baseline
+  Support: 82 days (12.2%)  Confidence: 87.8%  Lift: 2.21
+  Policy relevance (LLM annotation): 5/10
+  Insight: This rule relates to Phase 4, indicating that grocery spikes during weekends can lead to a calm mobile baseline. It provides situational awareness about consumer behavior patterns.
+  Recommendation: The Ministry of Economy should observe weekend grocery trends to optimize retail operations and ensure sufficient stock levels during peak shopping times.
 
 Rule 8:  
   IF:   sentiment_improved, solidarity_messages
   THEN: high_positive_sentiment
   Support: 114 days (17.0%)  Confidence: 78.9%  Lift: 2.05
-  LLM: novelty=2/10  policy_relevance=1/10
-  Why it matters: This rule suggests that improved sentiment and solidarity messages lead to high positive sentiment. However, this is a common occurrence and does not provide new insights.
-  Policy recommendation: No specific action is recommended as this rule does not provide actionable insights.
+  Policy relevance (LLM annotation): 6/10
+  Insight: This rule is relevant to Phase 4, showing that improved sentiment and solidarity messages can lead to high positive sentiment. It reflects community engagement during the crisis.
+  Recommendation: The UAE government should promote solidarity messages and monitor sentiment improvements to foster community resilience and support during ongoing recovery efforts.
 

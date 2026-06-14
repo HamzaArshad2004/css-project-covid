@@ -46,9 +46,10 @@ RULE PIPELINE QUALITY SUMMARY:
 --------------------------------------------------------------------------------
   Raw rules mined (support>=12%, lift>=1.8):   23
   After pruning & subsumption removal:         8
-  After LLM selection:                         8
   After temporal backtest (stable only):       7
   Predictive (lagged/lead) rules (pruned):     16
+  (Validity is set by the statistical pipeline above;
+   the LLM only annotates the resulting rules.)
 
 
 TEMPORAL BACKTEST (70/30 chronological split):
@@ -59,7 +60,8 @@ TEMPORAL BACKTEST (70/30 chronological split):
     DROPPED: grocery_spike, weekend → calm_mobile_baseline  (drop=12.2pp)
 
 
-TOP 7 ASSOCIATION RULES (BACKTEST-STABLE + LLM-EVALUATED):
+ASSOCIATION RULES (BACKTEST-STABLE (LLM-annotated)) — 7 total, statistically ordered:
+(LLM provides policy annotation only; it does not rank or select rules.)
 --------------------------------------------------------------------------------
 
 Rule 1: [CROSS-DOMAIN]
@@ -72,9 +74,9 @@ Rule 1: [CROSS-DOMAIN]
   Leverage: 0.070
   Composite Score: 0.524
   Temporal Validity: 0.500
-  LLM: novelty=8/10  policy_relevance=7/10
-  Why it matters: This rule relates to Phase 3, where high positive sentiment and grocery spikes co-occur. The unexpected direction is that high positive sentiment and grocery spikes lead to calm mobile baseline, suggesting a potential stabilization in behavior rather than a direct correlation with increased mobility.
-  Policy recommendation: The NCEMA should monitor the combination of grocery spikes and high positive sentiment as a signal for potential stabilization. If this condition is met, consider reinforcing public messaging to maintain this positive sentiment.
+  Policy relevance (LLM annotation): 7/10
+  Insight: This rule relates to Phase 3, where high positive sentiment and grocery spikes are expected to stabilize mobility. The non-obvious direction is that positive sentiment and grocery spikes lead to a calm mobile baseline, suggesting a potential for complacency despite ongoing health concerns.
+  Recommendation: NCEMA should monitor the combination of grocery spikes and high positive sentiment. If both are observed, consider reinforcing public health messaging to maintain vigilance.
 
 Rule 2: [CROSS-DOMAIN]
   IF:   grocery_spike, vaccine_mentioned
@@ -86,9 +88,9 @@ Rule 2: [CROSS-DOMAIN]
   Leverage: 0.105
   Composite Score: 0.510
   Temporal Validity: 0.500
-  LLM: novelty=7/10  policy_relevance=6/10
-  Why it matters: This rule also pertains to Phase 3, where the mention of vaccines coincides with grocery spikes. The non-obvious direction is that these factors together lead to a calm mobile baseline, indicating that positive sentiment around vaccines may stabilize mobility rather than increase it.
-  Policy recommendation: The DHA should utilize the correlation between grocery spikes and vaccine mentions to enhance public health campaigns. If both conditions are observed, initiate outreach to reinforce vaccine confidence and community engagement.
+  Policy relevance (LLM annotation): 6/10
+  Insight: This rule also pertains to Phase 3, where vaccine mentions are expected to correlate with mobility stabilization. The unexpected aspect is that the combination of grocery spikes and vaccine mentions leads to a calm mobile baseline, indicating a potential disconnect between vaccination progress and mobility behavior.
+  Recommendation: DHA should track grocery spikes alongside vaccine mentions. If both conditions are met, initiate community outreach to ensure continued adherence to health guidelines despite mobility normalization.
 
 Rule 3: [CROSS-DOMAIN]
   IF:   health_concern, calm_mobile_baseline
@@ -100,25 +102,11 @@ Rule 3: [CROSS-DOMAIN]
   Leverage: 0.071
   Composite Score: 0.375
   Temporal Validity: 0.500
-  LLM: novelty=8/10  policy_relevance=6/10
-  Why it matters: This rule connects health concern with grocery spikes during Phase 2 and 3. The unexpected aspect is that heightened health concerns can lead to increased grocery activity, suggesting a proactive response to perceived risks.
-  Policy recommendation: The NCEMA should track health concern levels alongside grocery spikes. If health concerns rise, preemptively increase supply chain monitoring to ensure grocery availability and prevent panic buying.
+  Policy relevance (LLM annotation): 6/10
+  Insight: This rule connects health concern with grocery spikes during Phase 4, where mobility is recovering. The unexpected direction is that ongoing health concerns can still drive grocery spikes, indicating that public anxiety may persist even as mobility increases.
+  Recommendation: WAM should monitor health concerns in conjunction with grocery spikes. If health concerns remain high while grocery spikes occur, consider targeted communication to address public anxiety.
 
 Rule 4: [CROSS-DOMAIN]
-  IF:   grocery_spike, sentiment_improved
-  THEN: high_positive_sentiment
-  Support: 82 days (12.2%)
-  Confidence: 75.6%
-  Lift: 1.97
-  Conviction: 2.524
-  Leverage: 0.045
-  Composite Score: 0.368
-  Temporal Validity: 0.500
-  LLM: novelty=6/10  policy_relevance=5/10
-  Why it matters: This rule indicates that improved sentiment leads to high positive sentiment during Phase 3. While it aligns with the timeline, the direction is interesting as it suggests that positive sentiment can reinforce itself.
-  Policy recommendation: The WAM should focus on amplifying positive narratives in media to sustain high positive sentiment. If sentiment improves, increase community engagement initiatives to further enhance public morale.
-
-Rule 5: [CROSS-DOMAIN]
   IF:   residential_increase, sentiment_improved
   THEN: high_positive_sentiment
   Support: 92 days (13.7%)
@@ -128,9 +116,23 @@ Rule 5: [CROSS-DOMAIN]
   Leverage: 0.050
   Composite Score: 0.368
   Temporal Validity: 0.500
-  LLM: novelty=5/10  policy_relevance=4/10
-  Why it matters: This rule shows that residential increase and improved sentiment lead to high positive sentiment during Phase 4. The correlation is expected but indicates a potential shift in community dynamics.
-  Policy recommendation: The NCEMA should monitor residential increases alongside sentiment improvements. If both are observed, consider community outreach to address potential isolation or anxiety in residential areas.
+  Policy relevance (LLM annotation): 4/10
+  Insight: This rule indicates that residential increases and improved sentiment lead to high positive sentiment during Phase 4. The correlation is expected but highlights the importance of residential behavior in shaping public sentiment.
+  Recommendation: DHA should assess residential trends alongside sentiment data. If residential increases coincide with sentiment improvements, consider community engagement strategies to sustain positive sentiment.
+
+Rule 5: [CROSS-DOMAIN]
+  IF:   grocery_spike, sentiment_improved
+  THEN: high_positive_sentiment
+  Support: 82 days (12.2%)
+  Confidence: 75.6%
+  Lift: 1.97
+  Conviction: 2.524
+  Leverage: 0.045
+  Composite Score: 0.368
+  Temporal Validity: 0.500
+  Policy relevance (LLM annotation): 5/10
+  Insight: This rule suggests that improved sentiment leads to high positive sentiment during Phase 3. While this is plausible, the direction is not trivial as it indicates a feedback loop where sentiment improvement is necessary for sustained positivity.
+  Recommendation: NCEMA should evaluate sentiment trends regularly. If sentiment improves significantly, consider reinforcing positive messaging to maintain the upward trend.
 
 Rule 6:
   IF:   calm_mobile_baseline
@@ -142,9 +144,9 @@ Rule 6:
   Leverage: 0.163
   Composite Score: 0.267
   Temporal Validity: 0.000
-  LLM: novelty=4/10  policy_relevance=3/10
-  Why it matters: This rule suggests that a calm mobile baseline leads to grocery spikes, which is somewhat expected. However, it highlights the importance of maintaining calmness in mobility patterns.
-  Policy recommendation: The NCEMA should ensure that messaging promotes calmness in mobility. If a calm mobile baseline is observed, reinforce community support systems to maintain stability.
+  Policy relevance (LLM annotation): 2/10
+  Insight: This rule indicates that a calm mobile baseline leads to grocery spikes, which is a tautological relationship. The direction is expected and does not provide new insights.
+  Recommendation: No specific action is recommended as this rule does not provide actionable insights.
 
 Rule 7:
   IF:   sentiment_improved, solidarity_messages
@@ -156,157 +158,158 @@ Rule 7:
   Leverage: 0.069
   Composite Score: 0.108
   Temporal Validity: 0.000
-  LLM: novelty=2/10  policy_relevance=1/10
-  Why it matters: This rule shows that solidarity messages and improved sentiment lead to high positive sentiment, which is somewhat tautological and expected.
-  Policy recommendation: The WAM should continue promoting solidarity messages, but the actionable insights from this rule are limited due to its expected nature.
+  Policy relevance (LLM annotation): 1/10
+  Insight: This rule suggests that improved sentiment and solidarity messages lead to high positive sentiment. However, this is a common occurrence and does not provide new insights.
+  Recommendation: No specific action is recommended as this rule does not provide actionable insights.
 
 
-TOP PREDICTIVE (LAGGED/LEAD) RULES — 16 total after pruning:
+PREDICTIVE (LAGGED/LEAD) RULES — 16 total, statistically ordered:
+(LLM provides policy annotation only; it does not rank or select rules.)
 --------------------------------------------------------------------------------
 
 Predictive Rule 1:
-  IF:   calm_mobile_baseline, high_positive_sentiment_lag1
-  THEN: grocery_spike_lead7
-  Support: 96 days (14.6%)  Confidence: 91.7%  Lift: 2.11
-  LLM: novelty=9/10  policy_relevance=8/10
-  Lead time: 7 days
-  Why it matters: This rule suggests that a calm mobility baseline and high positive sentiment one day ago can forecast a grocery spike seven days ahead, indicating a strong emotional influence on mobility behavior. This non-trivial relationship can help in planning for increased grocery demand.
-  Policy recommendation: The National Emergency Crisis and Disaster Management Authority (NCEMA) should track sentiment and mobility data to prepare for potential increases in grocery demand, facilitating timely supply chain adjustments.
-
-Predictive Rule 2:
-  IF:   high_positive_sentiment, calm_mobile_baseline
-  THEN: grocery_spike_lead7
-  Support: 98 days (14.9%)  Confidence: 90.8%  Lift: 2.09
-  LLM: novelty=9/10  policy_relevance=8/10
-  Lead time: 7 days
-  Why it matters: The combination of high positive sentiment and a calm mobility baseline predicting a grocery spike seven days ahead reflects a significant emotional impact on consumer behavior. This rule is particularly relevant during Phase 2 when reopening was occurring.
-  Policy recommendation: The Ministry of Economy should monitor sentiment trends alongside mobility metrics to anticipate grocery demand and coordinate with suppliers for adequate stock levels.
-
-Predictive Rule 3:
   IF:   calm_mobile_baseline, vaccine_mentioned_lag3
   THEN: grocery_spike
   Support: 155 days (23.6%)  Confidence: 87.7%  Lift: 2.07
-  LLM: novelty=8/10  policy_relevance=7/10
   Lead time: 3 days
-  Why it matters: This rule indicates that a calm mobility baseline and mentions of vaccines three days prior predict a grocery spike, which aligns with Phase 2's reopening. The temporal direction is non-obvious as it connects sentiment and mobility with a lead time, enabling proactive grocery supply management.
-  Policy recommendation: The Ministry of Health and Prevention (MoHAP) should monitor vaccine mentions and mobility metrics to anticipate grocery demand spikes and ensure adequate supply.
+  Policy relevance (LLM annotation): 7/10
+  Insight: This rule indicates that a calm mobility baseline and mentions of vaccines can predict a spike in grocery shopping, which is relevant during Phase 1 when grocery spikes were observed. The temporal direction is non-obvious as it connects sentiment and mobility with a lead time.
+  Recommendation: The National Emergency Crisis and Disaster Management Authority (NCEMA) should monitor calm mobility and vaccine mentions to anticipate grocery demand spikes and ensure supply chain readiness.
+
+Predictive Rule 2:
+  IF:   calm_mobile_baseline, high_positive_sentiment_lag1
+  THEN: grocery_spike_lead7
+  Support: 96 days (14.6%)  Confidence: 91.7%  Lift: 2.11
+  Lead time: 7 days
+  Policy relevance (LLM annotation): 8/10
+  Insight: This rule suggests that high positive sentiment and a calm mobility baseline can forecast grocery spikes a week ahead, aligning with Phase 2's reopening. The cross-domain relationship between sentiment and mobility is significant and not trivial.
+  Recommendation: The Ministry of Health and Prevention (MoHAP) should track positive sentiment and mobility metrics to prepare for potential increases in grocery demand and adjust supply accordingly.
+
+Predictive Rule 3:
+  IF:   high_positive_sentiment, calm_mobile_baseline
+  THEN: grocery_spike_lead7
+  Support: 98 days (14.9%)  Confidence: 90.8%  Lift: 2.09
+  Lead time: 7 days
+  Policy relevance (LLM annotation): 8/10
+  Insight: The rule shows that high positive sentiment combined with a calm mobility baseline can predict grocery spikes, which is crucial during Phase 2. The forward-looking nature of this relationship is significant and actionable.
+  Recommendation: NCEMA should monitor positive sentiment trends to anticipate grocery demand fluctuations and coordinate with retailers to ensure adequate stock levels.
 
 Predictive Rule 4:
   IF:   calm_mobile_baseline, sentiment_worsened_lag7
   THEN: grocery_spike_lead7
   Support: 73 days (11.1%)  Confidence: 91.8%  Lift: 2.11
-  LLM: novelty=8/10  policy_relevance=7/10
   Lead time: 7 days
-  Why it matters: This rule indicates that a calm mobility baseline and worsened sentiment from seven days ago can forecast a grocery spike, highlighting the delayed impact of sentiment on consumer behavior. This is relevant in the context of Phase 2's compliance fatigue.
-  Policy recommendation: The NCEMA should monitor sentiment changes to predict grocery demand fluctuations, allowing for timely interventions in supply chain management.
+  Policy relevance (LLM annotation): 7/10
+  Insight: This rule indicates that a calm mobility baseline and worsened sentiment from a week ago can forecast grocery spikes, relevant during Phase 1. The temporal direction is insightful as it connects past sentiment to future mobility.
+  Recommendation: MoHAP should keep track of sentiment changes to predict grocery demand and ensure that supply chains are prepared for potential spikes.
 
 Predictive Rule 5:
   IF:   high_positive_sentiment, calm_mobile_baseline
   THEN: grocery_spike_lead2
   Support: 98 days (14.9%)  Confidence: 88.8%  Lift: 2.08
-  LLM: novelty=8/10  policy_relevance=7/10
   Lead time: 2 days
-  Why it matters: A calm mobility baseline and high positive sentiment predicting a grocery spike two days ahead suggests a quick emotional response influencing consumer behavior. This is particularly relevant during the reopening phase.
-  Policy recommendation: The Ministry of Health and Prevention (MoHAP) should track sentiment and mobility metrics to prepare for short-term increases in grocery demand, ensuring supply chain readiness.
+  Policy relevance (LLM annotation): 7/10
+  Insight: This rule suggests that high positive sentiment and a calm mobility baseline can predict grocery spikes two days ahead, which is relevant during Phase 2. The connection between sentiment and mobility is noteworthy.
+  Recommendation: NCEMA should monitor sentiment and mobility data to anticipate grocery demand and facilitate effective supply chain management.
 
 Predictive Rule 6:
   IF:   calm_mobile_baseline, high_positive_sentiment_lag1
   THEN: grocery_spike
   Support: 96 days (14.6%)  Confidence: 88.5%  Lift: 2.09
-  LLM: novelty=7/10  policy_relevance=6/10
   Lead time: 1 days
-  Why it matters: This rule shows that a calm mobility baseline and high positive sentiment one day ago can lead to a grocery spike today, indicating a direct emotional influence on current behavior. This is expected but still relevant.
-  Policy recommendation: The Ministry of Economy should monitor sentiment and mobility data to assess immediate grocery demand and adjust supply chains accordingly.
+  Policy relevance (LLM annotation): 6/10
+  Insight: This rule indicates that a calm mobility baseline and high positive sentiment from the previous day can forecast immediate grocery spikes, relevant during Phase 2. The relationship is within-domain but still significant.
+  Recommendation: MoHAP should track daily sentiment and mobility metrics to respond quickly to changes in grocery demand.
 
 Predictive Rule 7:
   IF:   calm_mobile_baseline, sentiment_worsened_lag7
   THEN: grocery_spike
   Support: 73 days (11.1%)  Confidence: 90.4%  Lift: 2.13
-  LLM: novelty=6/10  policy_relevance=5/10
   Lead time: 7 days
-  Why it matters: The rule indicates that a calm mobility baseline and worsened sentiment from seven days ago can lead to a grocery spike today, suggesting a delayed emotional impact. This is a common expectation but still useful.
-  Policy recommendation: The NCEMA should keep an eye on sentiment trends to anticipate grocery demand changes, aiding in supply chain management.
+  Policy relevance (LLM annotation): 6/10
+  Insight: This rule shows that a calm mobility baseline and worsened sentiment from a week ago can predict immediate grocery spikes, relevant during Phase 1. The temporal direction is insightful but expected.
+  Recommendation: NCEMA should monitor sentiment trends to prepare for potential grocery demand increases and ensure supply chain readiness.
 
 Predictive Rule 8:
-  IF:   lockdown_mentioned, lockdown_mentioned_lag3
-  THEN: residential_increase_lead2
-  Support: 79 days (12.0%)  Confidence: 79.7%  Lift: 1.81
-  LLM: novelty=6/10  policy_relevance=5/10
-  Lead time: 2 days
-  Why it matters: This rule suggests that mentions of lockdown and previous lockdown mentions can predict a residential increase two days ahead, indicating a potential behavioral response to policy discussions.
-  Policy recommendation: The NCEMA should monitor lockdown discussions to anticipate residential behavior changes and adjust public health messaging accordingly.
-
-Predictive Rule 9:
   IF:   grocery_spike, high_positive_sentiment_lag1
   THEN: calm_mobile_baseline
   Support: 105 days (16.0%)  Confidence: 81.0%  Lift: 2.09
-  LLM: novelty=5/10  policy_relevance=4/10
   Lead time: 1 days
-  Why it matters: This rule shows that a grocery spike and high positive sentiment one day ago can predict a calm mobility baseline, indicating a feedback loop but lacking novelty. It reflects expected behavior.
-  Policy recommendation: The Ministry of Health and Prevention (MoHAP) should monitor grocery spikes and sentiment to understand mobility patterns, aiding in situational awareness.
+  Policy relevance (LLM annotation): 5/10
+  Insight: This rule indicates that a grocery spike and high positive sentiment from the previous day can forecast a calm mobility baseline, which is a within-domain relationship. The direction is expected but still useful.
+  Recommendation: MoHAP should monitor grocery spikes and sentiment to maintain situational awareness of mobility trends.
 
-Predictive Rule 10:
+Predictive Rule 9:
   IF:   grocery_spike, sentiment_worsened_lag3
   THEN: calm_mobile_baseline
   Support: 81 days (12.3%)  Confidence: 82.7%  Lift: 2.14
-  LLM: novelty=5/10  policy_relevance=4/10
   Lead time: 3 days
-  Why it matters: The rule indicates that a grocery spike and worsened sentiment from three days ago can predict a calm mobility baseline, suggesting a feedback loop that is expected but not novel.
-  Policy recommendation: The NCEMA should track grocery spikes and sentiment to maintain situational awareness regarding mobility trends.
+  Policy relevance (LLM annotation): 5/10
+  Insight: This rule shows that a grocery spike and worsened sentiment from three days ago can predict a calm mobility baseline, which is a within-domain relationship. The direction is expected but still relevant.
+  Recommendation: NCEMA should keep track of grocery spikes and sentiment to understand mobility patterns and adjust public health messaging accordingly.
 
-Predictive Rule 11:
+Predictive Rule 10:
   IF:   grocery_spike, policy_governance_discussion_lag7
   THEN: calm_mobile_baseline
   Support: 72 days (11.0%)  Confidence: 83.3%  Lift: 2.16
-  LLM: novelty=5/10  policy_relevance=4/10
   Lead time: 7 days
-  Why it matters: This rule shows that a grocery spike and discussions on policy governance from seven days ago can predict a calm mobility baseline, indicating a feedback loop that is not particularly novel.
-  Policy recommendation: The Ministry of Health and Prevention (MoHAP) should monitor discussions on policy governance alongside grocery trends for situational awareness.
+  Policy relevance (LLM annotation): 5/10
+  Insight: This rule indicates that a grocery spike and discussions on policy governance from a week ago can forecast a calm mobility baseline, which is a within-domain relationship. The direction is expected but informative.
+  Recommendation: MoHAP should monitor discussions on policy governance alongside grocery spikes to gauge public sentiment and mobility trends.
 
-Predictive Rule 12:
-  IF:   calm_mobile_baseline, sentiment_improved_lag1
-  THEN: grocery_spike_lead2
-  Support: 74 days (11.3%)  Confidence: 78.4%  Lift: 1.83
-  LLM: novelty=5/10  policy_relevance=4/10
-  Lead time: 2 days
-  Why it matters: This rule indicates that a calm mobility baseline and improved sentiment one day ago can predict a grocery spike two days ahead, reflecting expected behavior without significant novelty.
-  Policy recommendation: The Ministry of Economy should monitor sentiment and mobility data to prepare for potential grocery demand increases.
-
-Predictive Rule 13:
+Predictive Rule 11:
   IF:   calm_mobile_baseline
   THEN: grocery_spike_lead2
   Support: 254 days (38.7%)  Confidence: 83.5%  Lift: 1.95
-  LLM: novelty=4/10  policy_relevance=3/10
   Lead time: 2 days
-  Why it matters: This rule indicates that a calm mobility baseline can lead to a grocery spike two days ahead, which is a straightforward expectation and lacks novelty.
-  Policy recommendation: The Ministry of Economy should keep monitoring mobility metrics to ensure grocery supply aligns with expected demand.
+  Policy relevance (LLM annotation): 3/10
+  Insight: This rule suggests that a calm mobility baseline can predict grocery spikes two days ahead, which is a within-domain relationship. The direction is expected and lacks novelty.
+  Recommendation: NCEMA should maintain awareness of mobility trends to anticipate grocery demand but may not require immediate action.
+
+Predictive Rule 12:
+  IF:   lockdown_mentioned, lockdown_mentioned_lag3
+  THEN: residential_increase_lead2
+  Support: 79 days (12.0%)  Confidence: 79.7%  Lift: 1.81
+  Lead time: 2 days
+  Policy relevance (LLM annotation): 5/10
+  Insight: This rule indicates that mentions of lockdown and previous lockdown mentions can forecast an increase in residential mobility two days ahead, relevant during Phase 1. The relationship is insightful but expected.
+  Recommendation: MoHAP should monitor lockdown discussions to prepare for potential increases in residential mobility and adjust public health messaging.
+
+Predictive Rule 13:
+  IF:   calm_mobile_baseline, sentiment_improved_lag1
+  THEN: grocery_spike_lead2
+  Support: 74 days (11.3%)  Confidence: 78.4%  Lift: 1.83
+  Lead time: 2 days
+  Policy relevance (LLM annotation): 4/10
+  Insight: This rule shows that a calm mobility baseline and improved sentiment from the previous day can predict grocery spikes two days ahead, which is a within-domain relationship. The direction is expected.
+  Recommendation: NCEMA should track sentiment improvements to maintain situational awareness of grocery demand but may not require immediate action.
 
 Predictive Rule 14:
   IF:   sentiment_improved, compliance_discussed_lag7
   THEN: high_positive_sentiment
   Support: 73 days (11.1%)  Confidence: 82.2%  Lift: 2.12
-  LLM: novelty=4/10  policy_relevance=3/10
   Lead time: 7 days
-  Why it matters: This rule shows that improved sentiment and discussions on compliance from seven days ago can predict high positive sentiment, which is a common expectation.
-  Policy recommendation: The Ministry of Health and Prevention (MoHAP) should monitor compliance discussions to maintain awareness of sentiment trends.
+  Policy relevance (LLM annotation): 3/10
+  Insight: This rule indicates that improved sentiment and discussions on compliance from a week ago can forecast high positive sentiment, which is a within-domain relationship. The direction is expected.
+  Recommendation: MoHAP should monitor compliance discussions to understand sentiment trends but may not require immediate action.
 
 Predictive Rule 15:
   IF:   sentiment_improved, lockdown_mentioned_lag7
   THEN: high_positive_sentiment
   Support: 77 days (11.7%)  Confidence: 76.6%  Lift: 1.97
-  LLM: novelty=4/10  policy_relevance=3/10
   Lead time: 7 days
-  Why it matters: This rule indicates that improved sentiment and mentions of lockdown from seven days ago can predict high positive sentiment, reflecting expected behavior.
-  Policy recommendation: The NCEMA should track lockdown discussions to understand their impact on public sentiment.
+  Policy relevance (LLM annotation): 3/10
+  Insight: This rule suggests that improved sentiment and mentions of lockdown from a week ago can forecast high positive sentiment, which is a within-domain relationship. The direction is expected.
+  Recommendation: NCEMA should keep track of lockdown discussions to gauge sentiment trends but may not require immediate action.
 
 Predictive Rule 16:
   IF:   sentiment_improved, vaccine_mentioned_lag3
   THEN: high_positive_sentiment
   Support: 85 days (12.9%)  Confidence: 75.3%  Lift: 1.94
-  LLM: novelty=4/10  policy_relevance=3/10
   Lead time: 3 days
-  Why it matters: This rule shows that improved sentiment and mentions of vaccines from three days ago can predict high positive sentiment, which is a predictable outcome.
-  Policy recommendation: The Ministry of Health and Prevention (MoHAP) should monitor vaccine discussions to gauge their impact on public sentiment.
+  Policy relevance (LLM annotation): 3/10
+  Insight: This rule indicates that improved sentiment and mentions of vaccines from three days ago can forecast high positive sentiment, which is a within-domain relationship. The direction is expected.
+  Recommendation: MoHAP should monitor vaccine discussions to understand sentiment trends but may not require immediate action.
 
 
 ================================================================================

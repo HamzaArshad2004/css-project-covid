@@ -29,7 +29,7 @@ RULE 1: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 15% of historical days)
 
   ACTION PLAYBOOK:
-    NCEMA should monitor the combination of grocery spikes and high positive sentiment. If both are observed, consider reinforcing public health messaging to maintain vigilance.
+    The National Emergency Crisis and Disaster Management Authority (NCEMA) should monitor grocery trends and positive sentiment as triggers to assess public readiness for further easing of restrictions.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -55,7 +55,7 @@ RULE 2: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 26% of historical days)
 
   ACTION PLAYBOOK:
-    DHA should track grocery spikes alongside vaccine mentions. If both conditions are met, initiate community outreach to ensure continued adherence to health guidelines despite mobility normalization.
+    The Department of Health Abu Dhabi (DHA) should use grocery spikes and vaccine mentions as indicators to promote vaccination campaigns and public health messaging.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -81,38 +81,12 @@ RULE 3: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 20% of historical days)
 
   ACTION PLAYBOOK:
-    WAM should monitor health concerns in conjunction with grocery spikes. If health concerns remain high while grocery spikes occur, consider targeted communication to address public anxiety.
+    The Ministry of Health and Prevention (MoHAP) should track health concern levels and mobile baselines to anticipate changes in grocery demand and adjust supply chain strategies accordingly.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
 ========================================================================
 RULE 4: [CROSS-DOMAIN]
-
-  WHEN THESE CONDITIONS ARE OBSERVED:
-    • spike in grocery / retail mobility
-    • improving public sentiment
-
-  EXPECTED OUTCOME:  high positive sentiment in social media
-
-  STATISTICS:
-    Support   : 12.2% of analysis days
-    Confidence: 75.6%
-    Lift      : 1.97x  (baseline rate)
-    Conviction  : 2.524
-    Leverage    : 0.045
-    Composite_score: 0.368
-
-  SIGNAL WINDOW  : Daily monitoring (same-day signal)
-  LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
-  TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 12% of historical days)
-
-  ACTION PLAYBOOK:
-    NCEMA should evaluate sentiment trends regularly. If sentiment improves significantly, consider reinforcing positive messaging to maintain the upward trend.
-
-  FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
-
-========================================================================
-RULE 5: [CROSS-DOMAIN]
 
   WHEN THESE CONDITIONS ARE OBSERVED:
     • increase in residential dwell time
@@ -133,7 +107,33 @@ RULE 5: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 14% of historical days)
 
   ACTION PLAYBOOK:
-    DHA should assess residential trends alongside sentiment data. If residential increases coincide with sentiment improvements, consider community engagement strategies to sustain positive sentiment.
+    The UAE government should monitor residential mobility and sentiment improvements to gauge community morale and readiness for further policy adjustments.
+
+  FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
+
+========================================================================
+RULE 5: [CROSS-DOMAIN]
+
+  WHEN THESE CONDITIONS ARE OBSERVED:
+    • spike in grocery / retail mobility
+    • improving public sentiment
+
+  EXPECTED OUTCOME:  high positive sentiment in social media
+
+  STATISTICS:
+    Support   : 12.2% of analysis days
+    Confidence: 75.6%
+    Lift      : 1.97x  (baseline rate)
+    Conviction  : 2.524
+    Leverage    : 0.045
+    Composite_score: 0.368
+
+  SIGNAL WINDOW  : Daily monitoring (same-day signal)
+  LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
+  TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 12% of historical days)
+
+  ACTION PLAYBOOK:
+    The UAE's Ministry of Economy should analyze grocery trends and sentiment improvements to inform economic recovery strategies and support local businesses.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -158,7 +158,7 @@ RULE 6: [CONTEMPORANEOUS]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 40% of historical days)
 
   ACTION PLAYBOOK:
-    No specific action is recommended as this rule does not provide actionable insights.
+    The NCEMA should monitor mobile baselines to anticipate grocery demand fluctuations and ensure adequate supply chain management.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -184,7 +184,7 @@ RULE 7: [CONTEMPORANEOUS]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 17% of historical days)
 
   ACTION PLAYBOOK:
-    No specific action is recommended as this rule does not provide actionable insights.
+    The UAE government should promote solidarity messages and monitor sentiment improvements to foster community resilience and support during ongoing recovery efforts.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 

@@ -538,7 +538,13 @@ class ResultsVisualizer:
         print(f"  ✓ Saved to {output_file}")
 
     def create_summary_report(self):
-        """Generate text summary"""
+        """Generate text summary.
+
+        Rules are ordered and INCLUDED based on OBJECTIVE STATISTICS only
+        (the pipeline's composite_score / cross-domain / lift). The optional LLM
+        step is a post-hoc annotation layer: it adds a policy-relevance score and
+        rationale per rule but never selects, ranks, or validates rules.
+        """
         print("Creating summary report...")
 
         output_file = OUTPUT_DIR.parent / 'summary_report.txt'
@@ -546,24 +552,23 @@ class ResultsVisualizer:
 
         fca_dir = RULES_FILE.parent
 
-        # ---- Load rule files (preference order) ----
         def _try_load(path):
             try:
                 return pd.read_csv(path)
             except Exception:
                 return None
 
-        stable_df   = _try_load(fca_dir / "association_rules_stable.csv")
+        stable_df    = _try_load(fca_dir / "association_rules_stable.csv")
         evaluated_df = _try_load(fca_dir / "association_rules_evaluated.csv")
-        raw_df      = _try_load(RULES_FILE)
+        raw_df       = _try_load(RULES_FILE)
 
         # Primary display: stable > evaluated > raw
         if stable_df is not None and len(stable_df) > 0:
             rules_df = stable_df
-            rules_source = "BACKTEST-STABLE + LLM-EVALUATED"
+            rules_source = "BACKTEST-STABLE (LLM-annotated)"
         elif evaluated_df is not None and len(evaluated_df) > 0:
             rules_df = evaluated_df
-            rules_source = "LLM-EVALUATED"
+            rules_source = "STATISTICALLY VALIDATED (LLM-annotated)"
         elif raw_df is not None:
             rules_df = raw_df
             rules_source = "STATISTICAL (raw)"
@@ -571,16 +576,19 @@ class ResultsVisualizer:
             rules_df = pd.DataFrame()
             rules_source = "none"
 
-        llm_available = (
-            "llm_rank" in rules_df.columns and rules_df["llm_rank"].notna().any()
+        annotated = (
+            "policy_score" in rules_df.columns and rules_df["policy_score"].notna().any()
             if not rules_df.empty else False
         )
 
-        # Predictive rules
         pred_df = _try_load(fca_dir / "association_rules_predictive_pruned.csv")
-
-        # Backtest report
         backtest_df = _try_load(fca_dir / "backtest_report.csv")
+
+        def _stat_sort(d):
+            if "composite_score" in d.columns and d["composite_score"].notna().any():
+                return d.sort_values("composite_score", ascending=False)
+            cols = [c for c in ["cross_domain", "lift", "confidence"] if c in d.columns]
+            return d.sort_values(cols, ascending=[False] * len(cols)) if cols else d
 
         with open(output_file, 'w') as f:
             f.write("=" * 80 + "\n")
@@ -588,7 +596,6 @@ class ResultsVisualizer:
             f.write("UAE COVID-19 ANALYSIS\n")
             f.write("=" * 80 + "\n\n")
 
-            # ---- Data overview ----
             f.write("DATA OVERVIEW:\n")
             f.write("-" * 80 + "\n")
             f.write(f"Analysis Period: {self.features_df['Date'].min().date()} to {self.features_df['Date'].max().date()}\n")
@@ -596,7 +603,6 @@ class ResultsVisualizer:
             binary_cols = self.binary_columns(self.features_df, exclude={'Date', 'num_posts'})
             f.write(f"Binary Features: {len(binary_cols)}\n\n")
 
-            # ---- Feature activation ----
             f.write("FEATURE ACTIVATION SUMMARY:\n")
             f.write("-" * 80 + "\n")
             for col in sorted(binary_cols):
@@ -612,13 +618,12 @@ class ResultsVisualizer:
             scored_df = _try_load(fca_dir / "association_rules_scored.csv")
             if scored_df is not None:
                 f.write(f"  After pruning & subsumption removal:         {len(scored_df)}\n")
-            if evaluated_df is not None:
-                n_llm = int(evaluated_df.get("llm_rank", pd.Series(dtype=float)).notna().sum())
-                f.write(f"  After LLM selection:                         {n_llm}\n")
             if stable_df is not None:
                 f.write(f"  After temporal backtest (stable only):       {len(stable_df)}\n")
             if pred_df is not None:
                 f.write(f"  Predictive (lagged/lead) rules (pruned):     {len(pred_df)}\n")
+            f.write("  (Validity is set by the statistical pipeline above;\n")
+            f.write("   the LLM only annotates the resulting rules.)\n")
 
             # ---- Backtest stability ----
             if backtest_df is not None and "stable" in backtest_df.columns:
@@ -635,20 +640,13 @@ class ResultsVisualizer:
                         f.write(f"    DROPPED: {r['premise']} → {r['conclusion']}"
                                 f"  (drop={r['confidence_drop']:.1f}pp)\n")
 
-            # ---- Main association rules ----
+            # ---- Main association rules (statistically ordered) ----
             if len(rules_df) > 0:
-                if llm_available:
-                    top_rules = (
-                        rules_df[rules_df["llm_rank"].notna()]
-                        .sort_values("llm_rank")
-                    )
-                    n = len(top_rules)
-                    f.write(f"\n\nTOP {n} ASSOCIATION RULES ({rules_source}):\n")
-                else:
-                    sort_col = "composite_score" if "composite_score" in rules_df.columns else "lift"
-                    top_rules = rules_df.sort_values(sort_col, ascending=False).head(15)
-                    n = len(top_rules)
-                    f.write(f"\n\nTOP {n} ASSOCIATION RULES ({rules_source}):\n")
+                top_rules = _stat_sort(rules_df)
+                n = len(top_rules)
+                f.write(f"\n\nASSOCIATION RULES ({rules_source}) — {n} total, statistically ordered:\n")
+                if annotated:
+                    f.write("(LLM provides policy annotation only; it does not rank or select rules.)\n")
                 f.write("-" * 80 + "\n")
 
                 for rank_i, (_, row) in enumerate(top_rules.iterrows(), start=1):
@@ -671,54 +669,56 @@ class ResultsVisualizer:
                                 f.write(f"  {label}: {float(val):.3f}\n")
                             except (ValueError, TypeError):
                                 pass
-                    novelty = row.get("novelty_score")
-                    policy  = row.get("policy_score")
-                    if pd.notna(novelty) and pd.notna(policy):
-                        f.write(f"  LLM: novelty={int(novelty)}/10  policy_relevance={int(policy)}/10\n")
+                    policy = row.get("policy_score")
+                    if pd.notna(policy):
+                        f.write(f"  Policy relevance (LLM annotation): {int(policy)}/10\n")
                     reasoning = row.get("llm_reasoning", "")
                     if reasoning and str(reasoning).strip() not in ("", "nan"):
-                        f.write(f"  Why it matters: {reasoning}\n")
+                        f.write(f"  Insight: {reasoning}\n")
                     rec = row.get("llm_policy_recommendation", "")
                     if rec and str(rec).strip() not in ("", "nan"):
-                        f.write(f"  Policy recommendation: {rec}\n")
+                        f.write(f"  Recommendation: {rec}\n")
 
-            # ---- Predictive rules section ----
+            # ---- Predictive rules section (ALL, statistically ordered) ----
             if pred_df is not None and len(pred_df) > 0:
-                # Prefer LLM-evaluated predictive rules if available
                 pred_eval_path = fca_dir / "association_rules_predictive_evaluated.csv"
                 if pred_eval_path.exists():
                     pred_display = pd.read_csv(pred_eval_path)
-                    pred_has_llm = "llm_rank" in pred_display.columns and pred_display["llm_rank"].notna().any()
                 else:
                     pred_display = pred_df
-                    pred_has_llm = False
+                pred_annotated = (
+                    "policy_score" in pred_display.columns
+                    and pred_display["policy_score"].notna().any()
+                )
 
-                f.write(f"\n\nTOP PREDICTIVE (LAGGED/LEAD) RULES — {len(pred_df)} total after pruning:\n")
+                pred_sorted = _stat_sort(pred_display)
+                f.write(f"\n\nPREDICTIVE (LAGGED/LEAD) RULES — {len(pred_sorted)} total, statistically ordered:\n")
+                if pred_annotated:
+                    f.write("(LLM provides policy annotation only; it does not rank or select rules.)\n")
                 f.write("-" * 80 + "\n")
-                if pred_has_llm:
-                    top_pred = pred_display[pred_display["llm_rank"].notna()].sort_values("llm_rank")
-                else:
-                    sort_col = "composite_score" if "composite_score" in pred_display.columns else "lift"
-                    top_pred = pred_display.sort_values(sort_col, ascending=False)
 
-                for rank_i, (_, row) in enumerate(top_pred.iterrows(), start=1):
+                for rank_i, (_, row) in enumerate(pred_sorted.iterrows(), start=1):
                     f.write(f"\nPredictive Rule {rank_i}:\n")
                     f.write(f"  IF:   {row['premise']}\n")
                     f.write(f"  THEN: {row['conclusion']}\n")
                     f.write(f"  Support: {int(row['support'])} days ({float(row['support_pct']):.1f}%)"
                             f"  Confidence: {float(row['confidence']):.1f}%"
                             f"  Lift: {float(row['lift']):.2f}\n")
-                    if pred_has_llm and pd.notna(row.get("llm_rank")):
-                        f.write(f"  LLM: novelty={row['novelty_score']}/10  policy_relevance={row['policy_score']}/10\n")
-                        lead = row.get("lead_time_days")
-                        if pd.notna(lead):
+                    lead = row.get("lead_time_days")
+                    if pd.notna(lead):
+                        try:
                             f.write(f"  Lead time: {int(lead)} days\n")
-                        reasoning = row.get("llm_reasoning", "")
-                        if reasoning and str(reasoning).strip() not in ("", "nan"):
-                            f.write(f"  Why it matters: {reasoning}\n")
-                        rec = row.get("llm_policy_recommendation", "")
-                        if rec and str(rec).strip() not in ("", "nan"):
-                            f.write(f"  Policy recommendation: {rec}\n")
+                        except (ValueError, TypeError):
+                            pass
+                    policy = row.get("policy_score")
+                    if pd.notna(policy):
+                        f.write(f"  Policy relevance (LLM annotation): {int(policy)}/10\n")
+                    reasoning = row.get("llm_reasoning", "")
+                    if reasoning and str(reasoning).strip() not in ("", "nan"):
+                        f.write(f"  Insight: {reasoning}\n")
+                    rec = row.get("llm_policy_recommendation", "")
+                    if rec and str(rec).strip() not in ("", "nan"):
+                        f.write(f"  Recommendation: {rec}\n")
 
             # ---- Pointer to policy briefs ----
             briefs_path = output_file.parent / "policy_briefs.txt"
