@@ -32,7 +32,7 @@ def _month_locator(ax, labelsize: float = 12) -> None:
     ax.xaxis.set_major_locator(mdates.MonthLocator(bymonth=[1, 4, 7, 10]))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %Y"))
     ax.xaxis.set_minor_locator(mdates.MonthLocator())
-    ax.tick_params(axis='x', rotation=30, labelsize=labelsize)
+    ax.tick_params(axis='x', rotation=30, labelsize=12)
 
 # ========= CONFIG =========
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -112,7 +112,7 @@ class ResultsVisualizer:
 
         fig, axes = plt.subplots(2, 2, figsize=(16, 10))
         fig.suptitle('UAE COVID-19 Mobility Trends (Mar 2020 – Dec 2021)',
-                     fontsize=22, fontweight='bold', y=0.99)
+                     fontsize=20, fontweight='bold', y=1.01)
 
         metrics = [
             ('retail_recreation_change', '#1f77b4', 'Retail & Recreation (% vs baseline)'),
@@ -135,9 +135,9 @@ class ResultsVisualizer:
                     color=color, linewidth=2.2, label='7-day avg')
             ax.axhline(0, color='black', linewidth=0.8, linestyle='--', alpha=0.4)
 
-            ax.set_title(label, fontsize=18, fontweight='bold')
-            ax.set_ylabel('% change', fontsize=16)
-            ax.legend(fontsize=14, loc='lower right')
+            ax.set_title(label, fontsize=15, fontweight='bold')
+            ax.set_ylabel('% change', fontsize=13)
+            ax.legend(fontsize=12, loc='lower right')
             ax.grid(True, alpha=0.25, axis='y')
             ax.tick_params(axis='y', labelsize=14)
             _month_locator(ax, labelsize=14)
@@ -148,7 +148,7 @@ class ResultsVisualizer:
                          for _, _, c, l in _PHASES]
         plt.tight_layout(rect=[0, 0.03, 1, 0.97])
         fig.legend(handles=phase_patches, loc='lower center', ncol=4,
-                   fontsize=14, framealpha=0.9, bbox_to_anchor=(0.5, 0.0))
+                   fontsize=12, framealpha=0.9, bbox_to_anchor=(0.5, -0.03))
 
         output_file = OUTPUT_DIR / 'mobility_trends.png'
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -166,7 +166,7 @@ class ResultsVisualizer:
 
         fig, axes = plt.subplots(2, 1, figsize=(15, 9), sharex=True)
         fig.suptitle('Reddit Sentiment During UAE COVID-19 (Mar 2020 – Dec 2021)',
-                     fontsize=22, fontweight='bold')
+                     fontsize=19, fontweight='bold')
 
         df = self.features_df.set_index('Date').sort_index()
 
@@ -185,12 +185,11 @@ class ResultsVisualizer:
         ax1.plot(roll14.index, roll14.values,
                  color='purple', linewidth=2.2, label='14-day avg')
         ax1.axhline(0, color='black', linewidth=0.9, linestyle='--', alpha=0.5)
-        ax1.set_ylabel('Compound Score', fontsize=16)
+        ax1.set_ylabel('Compound Score', fontsize=14)
         ax1.set_ylim(-1.1, 1.1)
-        ax1.legend(fontsize=14, loc='lower right')
+        ax1.legend(fontsize=12, loc='lower right')
         ax1.grid(True, alpha=0.2, axis='y')
-        ax1.set_title('Compound Sentiment', fontsize=18)
-        ax1.tick_params(axis='y', labelsize=14)
+        ax1.set_title('Compound Sentiment', fontsize=14)
 
         # ── Panel 2: Positive vs Negative fractions ────────────────────────
         ax2 = axes[1]
@@ -207,14 +206,13 @@ class ResultsVisualizer:
                      color='red', linewidth=0.5, alpha=0.3)
             ax2.plot(neg_roll.index, neg_roll.values,
                      color='red', linewidth=2, label='Negative (14-day avg)')
-        ax2.set_ylabel('Fraction of Posts', fontsize=16)
-        ax2.legend(fontsize=14, loc='upper right')
+        ax2.set_ylabel('Fraction of Posts', fontsize=14)
+        ax2.legend(fontsize=12, loc='upper right')
         ax2.grid(True, alpha=0.2, axis='y')
-        ax2.set_title('Positive vs Negative Post Fraction', fontsize=18)
-        ax2.tick_params(axis='y', labelsize=14)
+        ax2.set_title('Positive vs Negative Post Fraction', fontsize=14)
 
-        _month_locator(ax2, labelsize=14)
-        ax2.set_xlabel('Date', fontsize=16)
+        _month_locator(ax2)
+        ax2.set_xlabel('Date', fontsize=14)
 
         # Reserve a bottom band for the phase legend, then place it inside that band
         # so it never overlaps the 'Date' axis label.
@@ -222,7 +220,7 @@ class ResultsVisualizer:
                          for _, _, c, l in _PHASES]
         plt.tight_layout(rect=[0, 0.035, 1, 1])
         fig.legend(handles=phase_patches, loc='lower center', ncol=4,
-                   fontsize=14, framealpha=0.9, bbox_to_anchor=(0.5, 0.0))
+                   fontsize=12, framealpha=0.9, bbox_to_anchor=(0.5, -0.02))
 
         output_file = OUTPUT_DIR / 'sentiment_timeline.png'
         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -271,7 +269,7 @@ class ResultsVisualizer:
 
         # Y-axis: feature names
         ax.set_yticks(range(len(binary_cols)))
-        ax.set_yticklabels(binary_cols, fontsize=13)
+        ax.set_yticklabels(binary_cols, fontsize=11)
 
         # X-axis: bi-weekly period dates → show monthly labels
         period_dates = df_resampled.index
@@ -514,7 +512,7 @@ class ResultsVisualizer:
         # Value labels
         for bar, val in zip(bars, rates.values):
             ax.text(val + 0.5, bar.get_y() + bar.get_height() / 2,
-                    f'{val:.0f}%', va='center', fontsize=13)
+                    f'{val:.0f}%', va='center', fontsize=11)
 
         ax.set_xlabel('% of days active', fontsize=14)
         ax.set_title('Feature Activation Rates — 671 days (Mar 2020 – Dec 2021)',
