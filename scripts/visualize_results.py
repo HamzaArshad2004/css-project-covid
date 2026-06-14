@@ -9,6 +9,7 @@ import numpy as np
 import json
 from pathlib import Path
 import warnings
+import argparse
 warnings.filterwarnings('ignore')
 
 # UAE COVID policy phase boundaries
@@ -738,24 +739,39 @@ class ResultsVisualizer:
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Generate COVID result visualizations and/or summary report."
+    )
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help="Skip plots; regenerate only summary_report.txt from current result CSVs.",
+    )
+    args = parser.parse_args()
+ 
+    title = "SUMMARY REPORT (report-only)" if args.report_only else "RESULTS VISUALIZATION"
     print("=" * 70)
-    print("RESULTS VISUALIZATION")
+    print(title)
     print("=" * 70)
-
+ 
     visualizer = ResultsVisualizer()
-    visualizer.plot_mobility_trends()
-    visualizer.plot_sentiment_timeline()
-    visualizer.plot_features_heatmap()
-    visualizer.plot_combined_mobility_sentiment()
-    visualizer.plot_rules_overview()
-    visualizer.plot_feature_activation()
+ 
+    if not args.report_only:
+        visualizer.plot_mobility_trends()
+        visualizer.plot_sentiment_timeline()
+        visualizer.plot_features_heatmap()
+        visualizer.plot_combined_mobility_sentiment()
+        visualizer.plot_rules_overview()
+        visualizer.plot_feature_activation()
+ 
+    # Always run the report LAST so it reads the freshest CSVs available.
     visualizer.create_summary_report()
-
-    print("\n" + "=" * 70)
-    print("✓ VISUALIZATION COMPLETE")
+ 
+    print("\\n" + "=" * 70)
+    print("\\u2713 COMPLETE")
     print("=" * 70)
-    print(f"\nAll visualizations saved to: {OUTPUT_DIR}")
-
+    if not args.report_only:
+        print(f"\\nAll visualizations saved to: {OUTPUT_DIR}")
 
 if __name__ == "__main__":
     main()

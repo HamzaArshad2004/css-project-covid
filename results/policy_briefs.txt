@@ -1,7 +1,7 @@
 ========================================================================
   OPERATIONAL POLICY BRIEFS
   UAE COVID-19 CRISIS BEHAVIORAL ANALYSIS
-  Top 8 Rules — Actionable Intelligence for Policymakers
+  Top 7 Rules — Actionable Intelligence for Policymakers
 ========================================================================
 
 PURPOSE: Each brief translates a data-mining finding into a structured
@@ -9,32 +9,6 @@ operational signal for UAE government and public health officials.
 
 ========================================================================
 RULE 1: [CROSS-DOMAIN]
-
-  WHEN THESE CONDITIONS ARE OBSERVED:
-    • spike in grocery / retail mobility
-    • vaccine-related discourse active
-
-  EXPECTED OUTCOME:  calm-sentiment / unimpaired-mobility baseline period
-
-  STATISTICS:
-    Support   : 26.2% of analysis days
-    Confidence: 79.5%
-    Lift      : 2.01x  (baseline rate)
-    Conviction  : 2.951
-    Leverage    : 0.105
-    Composite_score: 0.482
-
-  SIGNAL WINDOW  : Daily monitoring (same-day signal)
-  LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
-  TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 26% of historical days)
-
-  ACTION PLAYBOOK:
-    Flag for policy review team; combine with secondary indicators before triggering a formal response.
-
-  FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
-
-========================================================================
-RULE 2: [CROSS-DOMAIN]
 
   WHEN THESE CONDITIONS ARE OBSERVED:
     • spike in grocery / retail mobility
@@ -48,14 +22,40 @@ RULE 2: [CROSS-DOMAIN]
     Lift      : 2.16x  (baseline rate)
     Conviction  : 4.145
     Leverage    : 0.070
-    Composite_score: 0.476
+    Composite_score: 0.524
 
   SIGNAL WINDOW  : Daily monitoring (same-day signal)
   LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 15% of historical days)
 
   ACTION PLAYBOOK:
-    Flag for policy review team; combine with secondary indicators before triggering a formal response.
+    The NCEMA should monitor the correlation between grocery spikes and positive sentiment. If both conditions are met, consider reinforcing public messaging to maintain calm and prevent panic buying.
+
+  FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
+
+========================================================================
+RULE 2: [CROSS-DOMAIN]
+
+  WHEN THESE CONDITIONS ARE OBSERVED:
+    • spike in grocery / retail mobility
+    • vaccine-related discourse active
+
+  EXPECTED OUTCOME:  calm-sentiment / unimpaired-mobility baseline period
+
+  STATISTICS:
+    Support   : 26.2% of analysis days
+    Confidence: 79.5%
+    Lift      : 2.01x  (baseline rate)
+    Conviction  : 2.951
+    Leverage    : 0.105
+    Composite_score: 0.510
+
+  SIGNAL WINDOW  : Daily monitoring (same-day signal)
+  LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
+  TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 26% of historical days)
+
+  ACTION PLAYBOOK:
+    The DHA should track vaccine mentions alongside grocery spikes. If both are observed, initiate community outreach to reinforce positive messaging about vaccine efficacy and community health.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -81,38 +81,12 @@ RULE 3: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 20% of historical days)
 
   ACTION PLAYBOOK:
-    Notify grocery retailers and supply-chain coordinators to build stock reserves; stagger opening hours to reduce crowding risk.
+    The Ministry of Health should monitor health concern levels in relation to grocery demand. If health concerns rise, prepare to ensure supply chain stability and address public anxiety.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
 ========================================================================
 RULE 4: [CROSS-DOMAIN]
-
-  WHEN THESE CONDITIONS ARE OBSERVED:
-    • increase in residential dwell time
-    • improving public sentiment
-
-  EXPECTED OUTCOME:  high positive sentiment in social media
-
-  STATISTICS:
-    Support   : 13.7% of analysis days
-    Confidence: 75.0%
-    Lift      : 1.95x  (baseline rate)
-    Conviction  : 2.462
-    Leverage    : 0.050
-    Composite_score: 0.349
-
-  SIGNAL WINDOW  : Daily monitoring (same-day signal)
-  LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
-  TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 14% of historical days)
-
-  ACTION PLAYBOOK:
-    Flag for policy review team; combine with secondary indicators before triggering a formal response.
-
-  FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
-
-========================================================================
-RULE 5: [CROSS-DOMAIN]
 
   WHEN THESE CONDITIONS ARE OBSERVED:
     • spike in grocery / retail mobility
@@ -126,45 +100,45 @@ RULE 5: [CROSS-DOMAIN]
     Lift      : 1.97x  (baseline rate)
     Conviction  : 2.524
     Leverage    : 0.045
-    Composite_score: 0.346
+    Composite_score: 0.368
 
   SIGNAL WINDOW  : Daily monitoring (same-day signal)
   LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 12% of historical days)
 
   ACTION PLAYBOOK:
-    Flag for policy review team; combine with secondary indicators before triggering a formal response.
+    The NCEMA should utilize sentiment analysis to gauge public mood. If sentiment improves, consider launching campaigns to further enhance community morale and compliance.
+
+  FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
+
+========================================================================
+RULE 5: [CROSS-DOMAIN]
+
+  WHEN THESE CONDITIONS ARE OBSERVED:
+    • increase in residential dwell time
+    • improving public sentiment
+
+  EXPECTED OUTCOME:  high positive sentiment in social media
+
+  STATISTICS:
+    Support   : 13.7% of analysis days
+    Confidence: 75.0%
+    Lift      : 1.95x  (baseline rate)
+    Conviction  : 2.462
+    Leverage    : 0.050
+    Composite_score: 0.368
+
+  SIGNAL WINDOW  : Daily monitoring (same-day signal)
+  LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
+  TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 14% of historical days)
+
+  ACTION PLAYBOOK:
+    The NCEMA should monitor residential trends alongside sentiment. If residential increases are noted, consider reinforcing community support initiatives to maintain positive sentiment.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
 ========================================================================
 RULE 6: [CONTEMPORANEOUS]
-
-  WHEN THESE CONDITIONS ARE OBSERVED:
-    • high positive sentiment in social media
-    • detectable shift in public sentiment
-
-  EXPECTED OUTCOME:  improving public sentiment
-
-  STATISTICS:
-    Support   : 26.7% of analysis days
-    Confidence: 82.7%
-    Lift      : 2.75x  (baseline rate)
-    Conviction  : 4.036
-    Leverage    : 0.140
-    Composite_score: 0.273
-
-  SIGNAL WINDOW  : Daily monitoring (same-day signal)
-  LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
-  TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 27% of historical days)
-
-  ACTION PLAYBOOK:
-    Flag for policy review team; combine with secondary indicators before triggering a formal response.
-
-  FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
-
-========================================================================
-RULE 7: [CONTEMPORANEOUS]
 
   WHEN THESE CONDITIONS ARE OBSERVED:
     • calm-sentiment / unimpaired-mobility baseline period
@@ -177,19 +151,19 @@ RULE 7: [CONTEMPORANEOUS]
     Lift      : 1.97x  (baseline rate)
     Conviction  : 3.549
     Leverage    : 0.163
-    Composite_score: 0.245
+    Composite_score: 0.267
 
   SIGNAL WINDOW  : Daily monitoring (same-day signal)
   LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 40% of historical days)
 
   ACTION PLAYBOOK:
-    Notify grocery retailers and supply-chain coordinators to build stock reserves; stagger opening hours to reduce crowding risk.
+    The NCEMA should ensure that calm mobility is maintained to prevent panic buying. If calm mobility is observed, consider promoting grocery store hours and availability.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
 ========================================================================
-RULE 8: [CONTEMPORANEOUS]
+RULE 7: [CONTEMPORANEOUS]
 
   WHEN THESE CONDITIONS ARE OBSERVED:
     • improving public sentiment
@@ -203,29 +177,28 @@ RULE 8: [CONTEMPORANEOUS]
     Lift      : 2.05x  (baseline rate)
     Conviction  : 2.924
     Leverage    : 0.069
-    Composite_score: 0.074
+    Composite_score: 0.108
 
   SIGNAL WINDOW  : Daily monitoring (same-day signal)
   LEAD TIME      : Same-day (contemporaneous correlation; not strictly predictive)
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 17% of historical days)
 
   ACTION PLAYBOOK:
-    Flag for policy review team; combine with secondary indicators before triggering a formal response.
+    The NCEMA should continue to promote solidarity messages as they correlate with improved sentiment, but no specific action is required.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
 ========================================================================
   SANITY DASHBOARD
 ========================================================================
-  Rules in brief        : 8
+  Rules in brief        : 7
   Predictive (lagged)   : 0  (0%)
-  Cross-domain          : 5  (62%)
-  Median support        : 18.7%
-  Median confidence     : 79.2%
-  Median lift           : 1.99x
+  Cross-domain          : 5  (71%)
+  Median support        : 17.0%
+  Median confidence     : 78.9%
+  Median lift           : 1.97x
 
   Consequent distribution:
-    high_positive_sentiment: 3 (38%)
-    calm_mobile_baseline: 2 (25%)
-    grocery_spike: 2 (25%)
-    sentiment_improved: 1 (12%)
+    high_positive_sentiment: 3 (43%)  *** consider rebalancing
+    calm_mobile_baseline: 2 (29%)
+    grocery_spike: 2 (29%)
