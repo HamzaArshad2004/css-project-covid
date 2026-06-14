@@ -29,7 +29,7 @@ RULE 1: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 15% of historical days)
 
   ACTION PLAYBOOK:
-    The NCEMA should monitor the correlation between grocery spikes and positive sentiment. If both conditions are met, consider reinforcing public messaging to maintain calm and prevent panic buying.
+    NCEMA should monitor the combination of grocery spikes and high positive sentiment. If both are observed, consider reinforcing public health messaging to maintain vigilance.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -55,7 +55,7 @@ RULE 2: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 26% of historical days)
 
   ACTION PLAYBOOK:
-    The DHA should track vaccine mentions alongside grocery spikes. If both are observed, initiate community outreach to reinforce positive messaging about vaccine efficacy and community health.
+    DHA should track grocery spikes alongside vaccine mentions. If both conditions are met, initiate community outreach to ensure continued adherence to health guidelines despite mobility normalization.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -81,7 +81,7 @@ RULE 3: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 20% of historical days)
 
   ACTION PLAYBOOK:
-    The Ministry of Health should monitor health concern levels in relation to grocery demand. If health concerns rise, prepare to ensure supply chain stability and address public anxiety.
+    WAM should monitor health concerns in conjunction with grocery spikes. If health concerns remain high while grocery spikes occur, consider targeted communication to address public anxiety.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -107,7 +107,7 @@ RULE 4: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 12% of historical days)
 
   ACTION PLAYBOOK:
-    The NCEMA should utilize sentiment analysis to gauge public mood. If sentiment improves, consider launching campaigns to further enhance community morale and compliance.
+    NCEMA should evaluate sentiment trends regularly. If sentiment improves significantly, consider reinforcing positive messaging to maintain the upward trend.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -133,7 +133,7 @@ RULE 5: [CROSS-DOMAIN]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 14% of historical days)
 
   ACTION PLAYBOOK:
-    The NCEMA should monitor residential trends alongside sentiment. If residential increases are noted, consider reinforcing community support initiatives to maintain positive sentiment.
+    DHA should assess residential trends alongside sentiment data. If residential increases coincide with sentiment improvements, consider community engagement strategies to sustain positive sentiment.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -158,7 +158,7 @@ RULE 6: [CONTEMPORANEOUS]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 40% of historical days)
 
   ACTION PLAYBOOK:
-    The NCEMA should ensure that calm mobility is maintained to prevent panic buying. If calm mobility is observed, consider promoting grocery store hours and availability.
+    No specific action is recommended as this rule does not provide actionable insights.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 
@@ -184,7 +184,7 @@ RULE 7: [CONTEMPORANEOUS]
   TRIGGER        : Alert when antecedent features are co-active on a day (base rate: 17% of historical days)
 
   ACTION PLAYBOOK:
-    The NCEMA should continue to promote solidarity messages as they correlate with improved sentiment, but no specific action is required.
+    No specific action is recommended as this rule does not provide actionable insights.
 
   FALSE ALARM RISK: MEDIUM — moderate certainty; corroborate with secondary signals
 

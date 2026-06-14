@@ -696,10 +696,10 @@ class ResultsVisualizer:
                 f.write(f"\n\nTOP PREDICTIVE (LAGGED/LEAD) RULES — {len(pred_df)} total after pruning:\n")
                 f.write("-" * 80 + "\n")
                 if pred_has_llm:
-                    top_pred = pred_display[pred_display["llm_rank"].notna()].sort_values("llm_rank").head(10)
+                    top_pred = pred_display[pred_display["llm_rank"].notna()].sort_values("llm_rank")
                 else:
                     sort_col = "composite_score" if "composite_score" in pred_display.columns else "lift"
-                    top_pred = pred_display.sort_values(sort_col, ascending=False).head(10)
+                    top_pred = pred_display.sort_values(sort_col, ascending=False)
 
                 for rank_i, (_, row) in enumerate(top_pred.iterrows(), start=1):
                     f.write(f"\nPredictive Rule {rank_i}:\n")

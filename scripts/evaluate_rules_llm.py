@@ -468,6 +468,196 @@ def _stratified_candidates(df: pd.DataFrame, candidate_pool: int) -> pd.DataFram
     return combined.head(candidate_pool)
 
 
+# ============================================================================
+# ADDITION 1 — new prompt: score ALL predictive rules, drop none.
+# Place this near PREDICTIVE_SYSTEM_PROMPT.
+# ============================================================================
+
+SCORE_ALL_PREDICTIVE_PROMPT = textwrap.dedent("""\
+    You are an expert data scientist and public health policy advisor reviewing
+    PREDICTIVE association rules mined from UAE COVID-19 crisis behavior data
+    (March 2020 – December 2021). These rules use lagged or lead features —
+    they describe how today's (or the recent past's) signals forecast future
+    behaviour.
+
+    The dataset combines daily Google Community Mobility metrics with Reddit
+    sentiment signals. Rules were mined using a lagged/lead feature matrix
+    (lags: 1, 3, 7 days; leads: 2, 7 days) and have ALREADY passed hard
+    statistical filters and a multi-stage pruning pipeline. Every rule shown is
+    statistically valid and points FORWARD in time.
+
+    ── FEATURE SUFFIX CONVENTIONS ────────────────────────────────────────────
+    _lag1, _lag3, _lag7  — feature was active 1/3/7 days AGO
+    _lead2, _lead7       — feature will be active in 2/7 days FROM NOW
+    No suffix            — feature is active TODAY
+    You do NOT report lead time; it is computed separately and deterministically.
+    Focus ONLY on NOVELTY and POLICY RELEVANCE.
+    ──────────────────────────────────────────────────────────────────────────
+
+    ── UAE COVID-19 POLICY TIMELINE ──────────────────────────────────────────
+    Phase 1 — Onset & first lockdown (Mar–May 2020): strict stay-home; curfew;
+      grocery stores exempted; grocery spikes; peak fear sentiment.
+    Phase 2 — Controlled reopening (Jun–Dec 2020): partial retail/workplace
+      reopening; compliance fatigue; second wave Sep–Oct.
+    Phase 3 — Vaccine rollout & optimism (Jan–Aug 2021): fast per-capita vaccine
+      programme; vaccine_mentioned spikes; positive sentiment recovery.
+    Phase 4 — Endemic transition (Sep–Dec 2021): restrictions lifted; mobility
+      returns to baseline; residual health_concern persists in discourse.
+    ──────────────────────────────────────────────────────────────────────────
+
+    ── NOVELTY SCORING RUBRIC (1–10) ─────────────────────────────────────────
+    10 — Cross-domain leading indicator: emotion/sentiment predicts a MOBILITY
+         outcome (or vice versa) with a non-obvious horizon.
+     8–9 — Cross-domain forward relationship; timing aligns with a known phase
+         transition but the cross-domain direction is non-trivial.
+     6–7 — Within-domain but non-trivial temporal persistence or mean reversion.
+     4–5 — Within-domain persistence that is broadly expected.
+     1–3 — Near-tautological (a slow-changing variable restating itself).
+
+    ── POLICY RELEVANCE SCORING RUBRIC (1–10) ────────────────────────────────
+    10 — Monitorable today/past trigger → real-world actionable future outcome;
+         names a UAE body (NCEMA, DHA, MoHAP, WAM) and action.
+     8–9 — Clear forward signal; operationalisation needs one more step.
+     6–7 — Useful monitoring signal; needs further validation.
+     4–5 — Same-domain persistence; situational awareness only.
+     1–3 — Consequent too generic or slow-changing to drive specific action.
+    ──────────────────────────────────────────────────────────────────────────
+
+    SCORING GUIDANCE (these LOWER a score — they do NOT remove the rule):
+    - Within-domain persistence (sentiment→sentiment, mobility→mobility) → score
+      novelty in the 4–5 band, not above.
+    - Consequent is near-constant (covid_topic_detected, dominant_emotion_fear,
+      ~85% of days) → policy 1–3.
+    - Rule restates a slow-changing variable → novelty 1–3.
+    Higher scores go to: emotion/discourse → mobility forecasts at 2–7 day lead;
+    mobility → sentiment feedback loops; phase-transition signals.
+
+    IMPORTANT: Score EVERY rule in the list below. Do NOT omit, filter, or
+    deduplicate. Return EXACTLY ONE object per input rule, with the same rule_id.
+    The number of objects you return MUST equal the number of rules provided.
+
+    Return ONLY a JSON array with one object per rule (any order):
+    [
+      {
+        "rule_id": <int — the id from the candidate list>,
+        "novelty_score": <int 1-10>,
+        "policy_score": <int 1-10>,
+        "reasoning": "<2-3 sentences: name the UAE phase, explain why the temporal direction is or is not non-obvious, state what the forecast enables>",
+        "policy_recommendation": "<2 sentences: name a specific UAE agency, the monitoring trigger, and the pre-emptive action>"
+      },
+      ...
+    ]
+    No markdown fences. No extra text. Valid JSON only.
+""")
+
+
+# ============================================================================
+# ADDITION 2 — new function: score ALL rules, annotate every row, drop none.
+# Place this next to select_top_rules_with_llm().
+# ============================================================================
+
+def score_all_rules_with_llm(
+    df: pd.DataFrame,
+    model: str = "gpt-4o-mini",
+    system_prompt: str | None = None,
+) -> pd.DataFrame:
+    """Score EVERY rule in df with the LLM (novelty + policy), dropping none.
+
+    Unlike select_top_rules_with_llm (which assigns scores only to a top-k the
+    model picks), this annotates all rows. Ranking happens afterward as a sort,
+    so a low-scored but statistically valid rule is retained, not filtered.
+
+    Adds columns: novelty_score, policy_score, llm_reasoning,
+    llm_policy_recommendation, lead_time_days, llm_composite, llm_rank
+    (llm_rank here is a post-hoc rank by llm_composite, for display only).
+    """
+    try:
+        from openai import OpenAI  # noqa: PLC0415
+    except ImportError:
+        print("ERROR: openai package not installed. Run: pip install openai", file=sys.stderr)
+        sys.exit(1)
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        print("ERROR: OPENAI_API_KEY not found.", file=sys.stderr)
+        sys.exit(1)
+
+    client = OpenAI(api_key=api_key)
+
+    df = df.copy().reset_index(drop=True)
+    df["rule_id"] = df.index
+
+    # Send ALL rules — no stratified subset, no candidate cap.
+    candidate_block = _build_candidate_block(df)
+    n = len(df)
+    user_msg = (
+        f"Score ALL {n} of the following rules. Return exactly {n} objects, "
+        f"one per rule_id:\n\n" + candidate_block
+    )
+
+    print(f"  Sending ALL {n} rules to LLM for full scoring ...")
+    active_prompt = system_prompt if system_prompt is not None else SCORE_ALL_PREDICTIVE_PROMPT
+    response = client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": active_prompt},
+            {"role": "user", "content": user_msg},
+        ],
+        temperature=0.2,
+        max_tokens=4000,  # higher: one object per rule, not just top-k
+    )
+
+    raw = response.choices[0].message.content.strip()
+    try:
+        scored = json.loads(raw)
+    except json.JSONDecodeError:
+        print(f"WARNING: LLM returned non-JSON:\n{raw}", file=sys.stderr)
+        print("Falling back to statistical ranking (no LLM scores).", file=sys.stderr)
+        return df
+    if not isinstance(scored, list):
+        print("WARNING: LLM response not a JSON array; skipping LLM scores.", file=sys.stderr)
+        return df
+
+    df["novelty_score"] = None
+    df["policy_score"] = None
+    df["llm_reasoning"] = ""
+    df["llm_policy_recommendation"] = ""
+    df["lead_time_days"] = None
+
+    valid_ids = set(df["rule_id"].tolist())
+    seen = set()
+    for entry in scored:
+        rid = entry.get("rule_id")
+        if rid not in valid_ids:
+            continue
+        idx = df.index[df["rule_id"] == rid][0]
+        df.at[idx, "novelty_score"] = entry.get("novelty_score")
+        df.at[idx, "policy_score"] = entry.get("policy_score")
+        df.at[idx, "llm_reasoning"] = entry.get("reasoning", "")
+        df.at[idx, "llm_policy_recommendation"] = entry.get("policy_recommendation", "")
+        df.at[idx, "lead_time_days"] = compute_lead_time_days(
+            str(df.at[idx, "premise"]), str(df.at[idx, "conclusion"])
+        )
+        seen.add(rid)
+
+    missing = valid_ids - seen
+    if missing:
+        print(
+            f"  WARNING: LLM did not score {len(missing)} rule(s): ids {sorted(missing)}. "
+            f"They are retained with null scores and sorted last.",
+            file=sys.stderr,
+        )
+
+    df["llm_composite"] = df[["novelty_score", "policy_score"]].mean(axis=1)
+    # Post-hoc display rank by composite (NOT a filter — every row keeps its data)
+    df["llm_rank"] = (
+        df["llm_composite"].rank(ascending=False, method="first").astype("Int64")
+    )
+
+    print(f"  LLM scored {df['novelty_score'].notna().sum()} / {n} rules.")
+    return df
+
+
 def select_top_rules_with_llm(
     df: pd.DataFrame,
     model: str = "gpt-4o-mini",
@@ -630,15 +820,16 @@ def write_summary(df: pd.DataFrame, out_path: Path, top_n: int = 10) -> None:
 # Predictive rules human-readable summary
 # ---------------------------------------------------------------------------
 
-def _write_predictive_summary(df: pd.DataFrame, out_path: Path, top_n: int = 10) -> None:
+def _write_predictive_summary(df: pd.DataFrame, out_path: Path, top_n: int | None = None) -> None:
     """Write a human-readable text summary of the LLM-evaluated predictive rules."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     llm_selected = "llm_rank" in df.columns and df["llm_rank"].notna().any()
-    ranked = (
-        df[df["llm_rank"].notna()].sort_values("llm_rank").head(top_n)
-        if llm_selected
-        else df.sort_values("lift", ascending=False).head(top_n)
-    )
+    if llm_selected:
+        ranked = df[df["llm_rank"].notna()].sort_values("llm_rank")
+    else:
+        ranked = df.sort_values("lift", ascending=False)
+    if top_n is not None:
+        ranked = ranked.head(top_n)
     with open(out_path, "w") as f:
         f.write("=" * 72 + "\n")
         f.write("  TOP PREDICTIVE RULES — TEMPORAL FORECASTING SIGNALS\n")
@@ -803,12 +994,11 @@ def main() -> None:
             except ImportError:
                 pass
 
-        print(f"\nRunning LLM evaluation with predictive-rules prompt ...")
-        pred_df = select_top_rules_with_llm(
+        print(f"\nScoring ALL {len(pred_df)} predictive rules (no top-k filter) ...")
+        pred_df = score_all_rules_with_llm(
             pred_df,
             model=args.model,
-            top_n=10,
-            system_prompt=PREDICTIVE_SYSTEM_PROMPT,
+            system_prompt=SCORE_ALL_PREDICTIVE_PROMPT,
         )
 
         # Sort: LLM-ranked first, then composite_score
