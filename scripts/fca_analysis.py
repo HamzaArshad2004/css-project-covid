@@ -4,6 +4,7 @@ Requires: pip install pandas numpy concepts networkx matplotlib
 """
 
 import math
+import re
 import pandas as pd
 from concepts import Context
 import networkx as nx
@@ -101,18 +102,40 @@ EMOTION_FEATURES = frozenset({
 })
 
 
+def _base_feature(feature: str) -> str:
+    """Strip a trailing _lagN / _leadN suffix to recover the base feature name.
+
+    Cross-domain classification (and any other domain lookup) must operate on
+    the base feature: ``vaccine_mentioned_lag3`` is an EMOTION feature just as
+    ``vaccine_mentioned`` is.  Without this, every lagged/lead feature in the
+    predictive matrix silently fails domain membership and rules are mis-tagged
+    as ``cross_domain=False`` even when they clearly span both domains.
+    """
+    return re.sub(r"_(lag|lead)\d+$", "", str(feature).strip())
+
+
 def _is_tautological(premise: tuple[str, ...], conclusion: str) -> bool:
-    """Return True if conclusion is definitionally implied by the premise."""
-    defs = TAUTOLOGY_DEFINITIONS.get(conclusion)
+    """Return True if conclusion is definitionally implied by the premise.
+
+    Suffixes are stripped so the same-day tautology rules also catch their
+    lagged/lead variants (e.g. ``sentiment_improved_lag1`` still counts as a
+    member of the ``sentiment_shift_detected`` definition group).
+    """
+    conclusion_base = _base_feature(conclusion)
+    defs = TAUTOLOGY_DEFINITIONS.get(conclusion_base)
     if defs is None:
         return False
-    premise_set = set(premise)
+    premise_set = {_base_feature(p) for p in premise}
     return all(any(f in premise_set for f in group) for group in defs)
 
 
 def _is_cross_domain(premise: tuple[str, ...], conclusion: str) -> bool:
-    """Return True if the rule spans both mobility and emotion domains."""
-    all_features = set(premise) | {conclusion}
+    """Return True if the rule spans both mobility and emotion domains.
+
+    Base feature names are used so lagged/lead variants are classified by the
+    domain of their underlying feature.
+    """
+    all_features = {_base_feature(p) for p in premise} | {_base_feature(conclusion)}
     return bool(all_features & MOBILITY_FEATURES) and bool(all_features & EMOTION_FEATURES)
 
 
@@ -291,7 +314,7 @@ class FCAAnalyzer:
             labels=concept_labels,
             node_color='lightblue',
             node_size=3000,
-            font_size=8,
+            font_size=12,
             font_weight='bold',
             arrows=True,
             arrowsize=20,
@@ -300,7 +323,7 @@ class FCAAnalyzer:
             with_labels=True,
         )
 
-        plt.title("Galois Lattice - Crisis Behavior Formal Concept Analysis", fontsize=16, fontweight='bold')
+        plt.title("Galois Lattice - Crisis Behavior Formal Concept Analysis", fontsize=20, fontweight='bold')
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         plt.close()
 

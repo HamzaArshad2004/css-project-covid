@@ -1,78 +1,51 @@
 ========================================================================
   TOP RULES — CROSS-DOMAIN MOBILITY × EMOTION ANALYSIS
   UAE COVID-19 PERIOD
-  LLM-SELECTED: Top 20 Most Novel & Policy-Relevant Rules
+  Top 20 Rules by Statistical Ranking (cross-domain priority)
 ========================================================================
 
 Rule 1:  [CROSS-DOMAIN] 
-  IF:   health_concern, calm_mobile_baseline
-  THEN: grocery_spike
-  Support: 137 days (20.4%)  Confidence: 77.4%  Lift: 1.82
-  LLM: novelty=8/10  policy_relevance=7/10
-  Why it matters: This rule relates to Phase 3, where health concerns were still prevalent despite mobility returning to baseline. The direction is non-obvious as one might expect grocery spikes to occur independently of health concerns, indicating a complex relationship. The expected lead time is unclear but suggests that health concerns can drive consumer behavior.
-  Policy recommendation: The NCEMA should monitor health_concern levels closely. If health_concern is high while mobility is stable, consider targeted public health campaigns to address lingering fears.
-
-Rule 2:  [CROSS-DOMAIN] 
   IF:   grocery_spike, high_positive_sentiment
   THEN: calm_mobile_baseline
   Support: 103 days (15.4%)  Confidence: 85.4%  Lift: 2.16
-  LLM: novelty=7/10  policy_relevance=6/10
-  Why it matters: This rule indicates that high positive sentiment and grocery spikes can lead to a calm mobile baseline, which is notable during Phase 3 when optimism was rising. The direction is not immediately obvious as one might expect mobility to fluctuate with sentiment rather than stabilize. The expected lead time is immediate, as sentiment can influence mobility decisions.
-  Policy recommendation: The WAM should utilize this insight to promote positive sentiment campaigns during periods of grocery spikes. If both grocery_spike and high_positive_sentiment are detected, consider reinforcing messaging around safety and community support.
 
-Rule 3:  [CROSS-DOMAIN] 
+Rule 2:  [CROSS-DOMAIN] 
   IF:   grocery_spike, vaccine_mentioned
   THEN: calm_mobile_baseline
   Support: 176 days (26.2%)  Confidence: 79.5%  Lift: 2.01
-  LLM: novelty=6/10  policy_relevance=6/10
-  Why it matters: This rule connects grocery spikes with vaccine mentions leading to a calm mobile baseline, relevant during Phase 3 when vaccination efforts were ramping up. The direction is interesting as one might expect vaccine discussions to correlate with increased mobility rather than calmness. The expected lead time is immediate, as vaccine discussions can influence consumer behavior.
-  Policy recommendation: DHA should leverage this relationship by promoting vaccine information during grocery spikes. If grocery_spike and vaccine_mentioned are both present, initiate community outreach to reinforce vaccination benefits.
 
-Rule 4:  
-  IF:   high_positive_sentiment, sentiment_shift_detected
-  THEN: sentiment_improved
-  Support: 179 days (26.7%)  Confidence: 82.7%  Lift: 2.75
-  LLM: novelty=5/10  policy_relevance=6/10
-  Why it matters: This rule suggests that high positive sentiment and sentiment shift detection lead to sentiment improvement, relevant during the transition to Phase 3. The direction is somewhat expected but highlights the importance of monitoring sentiment shifts. The expected lead time is same-day, as shifts can occur rapidly.
-  Policy recommendation: The NCEMA should track sentiment shifts closely. If high_positive_sentiment and sentiment_shift_detected occur simultaneously, consider deploying communication strategies to maintain positive public sentiment.
-
-Rule 5:  [CROSS-DOMAIN] 
+Rule 3:  [CROSS-DOMAIN] 
   IF:   grocery_spike, sentiment_improved
   THEN: high_positive_sentiment
   Support: 82 days (12.2%)  Confidence: 75.6%  Lift: 1.97
-  LLM: novelty=4/10  policy_relevance=5/10
-  Why it matters: This rule indicates that grocery spikes and sentiment improvement lead to high positive sentiment, which is plausible during Phase 3. The direction is expected, but it emphasizes the relationship between consumer behavior and sentiment. The expected lead time is same-day.
-  Policy recommendation: The WAM should monitor grocery spikes and sentiment improvement closely. If both are detected, consider reinforcing positive messaging around community resilience and support.
 
-Rule 6:  [CROSS-DOMAIN] 
+Rule 4:  [CROSS-DOMAIN] 
   IF:   residential_increase, sentiment_improved
   THEN: high_positive_sentiment
   Support: 92 days (13.7%)  Confidence: 75.0%  Lift: 1.95
-  LLM: novelty=3/10  policy_relevance=4/10
-  Why it matters: This rule shows that residential increase and sentiment improvement lead to high positive sentiment, which is somewhat expected during the pandemic. The direction is not surprising, as residential increases often correlate with positive sentiment. The expected lead time is same-day.
-  Policy recommendation: The NCEMA should monitor residential increases alongside sentiment improvements. If both are observed, consider promoting community engagement initiatives to sustain positive sentiment.
+
+Rule 5:  [CROSS-DOMAIN] 
+  IF:   health_concern, calm_mobile_baseline
+  THEN: grocery_spike
+  Support: 137 days (20.4%)  Confidence: 77.4%  Lift: 1.82
+
+Rule 6:  
+  IF:   high_positive_sentiment, sentiment_shift_detected
+  THEN: sentiment_improved
+  Support: 179 days (26.7%)  Confidence: 82.7%  Lift: 2.75
 
 Rule 7:  
-  IF:   sentiment_improved, solidarity_messages
-  THEN: high_positive_sentiment
-  Support: 114 days (17.0%)  Confidence: 78.9%  Lift: 2.05
-  LLM: novelty=3/10  policy_relevance=3/10
-  Why it matters: This rule indicates that sentiment improvement and solidarity messages lead to high positive sentiment, which is expected during times of community support. The direction is not surprising, as solidarity often correlates with positive sentiment. The expected lead time is same-day.
-  Policy recommendation: The WAM should encourage solidarity messaging during periods of sentiment improvement. If both solidarity_messages and sentiment_improved are detected, consider amplifying community support initiatives.
-
-Rule 8:  
-  IF:   calm_mobile_baseline
-  THEN: grocery_spike
-  Support: 266 days (39.6%)  Confidence: 83.8%  Lift: 1.97
-  LLM: novelty=2/10  policy_relevance=2/10
-  Why it matters: This rule shows that a calm mobile baseline leads to grocery spikes, which is a tautological relationship. The direction is expected, as calmness can lead to increased consumer activity. The expected lead time is same-day.
-  Policy recommendation: The NCEMA should monitor calm mobile baselines as indicators of potential grocery spikes. If calm_mobile_baseline is detected, prepare for increased consumer activity in grocery sectors.
-
-Rule 9:  
   IF:   grocery_spike, weekend
   THEN: calm_mobile_baseline
   Support: 82 days (12.2%)  Confidence: 87.8%  Lift: 2.21
-  LLM: novelty=1/10  policy_relevance=1/10
-  Why it matters: This rule indicates that grocery spikes on weekends lead to a calm mobile baseline, which is a predictable outcome. The direction is obvious, as weekends typically see increased grocery activity. The expected lead time is same-day.
-  Policy recommendation: The WAM should anticipate calm mobile baselines during weekends with grocery spikes. If grocery_spike and weekend are detected, prepare for increased consumer activity.
+
+Rule 8:  
+  IF:   sentiment_improved, solidarity_messages
+  THEN: high_positive_sentiment
+  Support: 114 days (17.0%)  Confidence: 78.9%  Lift: 2.05
+
+Rule 9:  
+  IF:   calm_mobile_baseline
+  THEN: grocery_spike
+  Support: 266 days (39.6%)  Confidence: 83.8%  Lift: 1.97
 

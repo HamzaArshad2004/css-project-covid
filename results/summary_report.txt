@@ -45,10 +45,10 @@ FEATURE ACTIVATION SUMMARY:
 RULE PIPELINE QUALITY SUMMARY:
 --------------------------------------------------------------------------------
   Raw rules mined (support>=12%, lift>=1.8):   23
-  After pruning & subsumption removal:         9
-  After LLM selection:                         9
+  After pruning & subsumption removal:         8
+  After LLM selection:                         0
   After temporal backtest (stable only):       8
-  Predictive (lagged/lead) rules (pruned):     40
+  Predictive (lagged/lead) rules (pruned):     16
 
 
 TEMPORAL BACKTEST (70/30 chronological split):
@@ -63,18 +63,15 @@ TOP 8 ASSOCIATION RULES (BACKTEST-STABLE + LLM-EVALUATED):
 --------------------------------------------------------------------------------
 
 Rule 1: [CROSS-DOMAIN]
-  IF:   health_concern, calm_mobile_baseline
-  THEN: grocery_spike
-  Support: 137 days (20.4%)
-  Confidence: 77.4%
-  Lift: 1.82
-  Conviction: 2.536
-  Leverage: 0.071
-  Composite Score: 0.375
+  IF:   grocery_spike, vaccine_mentioned
+  THEN: calm_mobile_baseline
+  Support: 176 days (26.2%)
+  Confidence: 79.5%
+  Lift: 2.01
+  Conviction: 2.951
+  Leverage: 0.105
+  Composite Score: 0.482
   Temporal Validity: 0.500
-  LLM: novelty=8/10  policy_relevance=7/10
-  Why it matters: This rule relates to Phase 3, where health concerns co-occur with grocery spikes. The direction is non-obvious as one might expect grocery spikes to occur without health concerns, indicating a complex relationship. The expected lead time is moderate, as health concerns may precede grocery spikes by a few days.
-  Policy recommendation: The National Emergency Crisis and Disaster Management Authority (NCEMA) should monitor health concern signals. If health concern increases while grocery spikes are detected, consider pre-positioning resources for food distribution within 3 days.
 
 Rule 2: [CROSS-DOMAIN]
   IF:   grocery_spike, high_positive_sentiment
@@ -86,53 +83,19 @@ Rule 2: [CROSS-DOMAIN]
   Leverage: 0.070
   Composite Score: 0.476
   Temporal Validity: 0.500
-  LLM: novelty=7/10  policy_relevance=6/10
-  Why it matters: This rule is relevant to Phase 4, where high positive sentiment and grocery spikes lead to a calm mobile baseline. The direction is non-obvious as one might expect mobility to remain high with grocery spikes. The expected lead time is short, as sentiment changes can quickly influence mobility.
-  Policy recommendation: The UAE Ministry of Health and Prevention (MoHAP) should track positive sentiment alongside grocery spikes. If both are observed, consider reinforcing public health messaging to maintain calm and compliance.
 
 Rule 3: [CROSS-DOMAIN]
-  IF:   grocery_spike, vaccine_mentioned
-  THEN: calm_mobile_baseline
-  Support: 176 days (26.2%)
-  Confidence: 79.5%
-  Lift: 2.01
-  Conviction: 2.951
-  Leverage: 0.105
-  Composite Score: 0.482
+  IF:   health_concern, calm_mobile_baseline
+  THEN: grocery_spike
+  Support: 137 days (20.4%)
+  Confidence: 77.4%
+  Lift: 1.82
+  Conviction: 2.536
+  Leverage: 0.071
+  Composite Score: 0.375
   Temporal Validity: 0.500
-  LLM: novelty=6/10  policy_relevance=5/10
-  Why it matters: This rule connects grocery spikes and vaccine mentions during Phase 3, where the vaccine rollout is expected to correlate with increased grocery activity. The direction is plausible but not trivially implied, as vaccine discussions may not directly lead to grocery spikes. The expected lead time is immediate.
-  Policy recommendation: The UAE Food Security Office should monitor grocery spikes in conjunction with vaccine mentions. If both occur simultaneously, consider enhancing food supply chains to meet potential increased demand.
 
 Rule 4: [CROSS-DOMAIN]
-  IF:   grocery_spike, sentiment_improved
-  THEN: high_positive_sentiment
-  Support: 82 days (12.2%)
-  Confidence: 75.6%
-  Lift: 1.97
-  Conviction: 2.524
-  Leverage: 0.045
-  Composite Score: 0.346
-  Temporal Validity: 0.500
-  LLM: novelty=5/10  policy_relevance=4/10
-  Why it matters: This rule indicates that an improved sentiment correlates with high positive sentiment during Phase 3. The direction is somewhat expected but highlights the importance of sentiment in driving public behavior. The expected lead time is short.
-  Policy recommendation: The UAE Government Communications Office should promote positive sentiment campaigns. If sentiment improves, ensure that public health messaging aligns with this positivity to encourage compliance.
-
-Rule 5:
-  IF:   high_positive_sentiment, sentiment_shift_detected
-  THEN: sentiment_improved
-  Support: 179 days (26.7%)
-  Confidence: 82.7%
-  Lift: 2.75
-  Conviction: 4.036
-  Leverage: 0.140
-  Composite Score: 0.273
-  Temporal Validity: 0.000
-  LLM: novelty=4/10  policy_relevance=4/10
-  Why it matters: This rule shows that high positive sentiment and sentiment shift detection lead to improved sentiment, relevant in the context of Phase 3. The direction is somewhat expected, as positive sentiment typically leads to further positivity. The expected lead time is immediate.
-  Policy recommendation: The UAE National Media Council should monitor sentiment shifts. If high positive sentiment is detected, consider amplifying positive narratives to sustain public morale.
-
-Rule 6: [CROSS-DOMAIN]
   IF:   residential_increase, sentiment_improved
   THEN: high_positive_sentiment
   Support: 92 days (13.7%)
@@ -142,9 +105,28 @@ Rule 6: [CROSS-DOMAIN]
   Leverage: 0.050
   Composite Score: 0.349
   Temporal Validity: 0.500
-  LLM: novelty=3/10  policy_relevance=3/10
-  Why it matters: This rule connects residential increases and improved sentiment to high positive sentiment, which is somewhat expected. The timing aligns with the general trend of increased positivity during the pandemic. The expected lead time is immediate.
-  Policy recommendation: The UAE Statistics Centre should analyze residential trends alongside sentiment data. If residential increases are noted, consider community engagement initiatives to maintain positive sentiment.
+
+Rule 5: [CROSS-DOMAIN]
+  IF:   grocery_spike, sentiment_improved
+  THEN: high_positive_sentiment
+  Support: 82 days (12.2%)
+  Confidence: 75.6%
+  Lift: 1.97
+  Conviction: 2.524
+  Leverage: 0.045
+  Composite Score: 0.346
+  Temporal Validity: 0.500
+
+Rule 6:
+  IF:   high_positive_sentiment, sentiment_shift_detected
+  THEN: sentiment_improved
+  Support: 179 days (26.7%)
+  Confidence: 82.7%
+  Lift: 2.75
+  Conviction: 4.036
+  Leverage: 0.140
+  Composite Score: 0.273
+  Temporal Validity: 0.000
 
 Rule 7:
   IF:   calm_mobile_baseline
@@ -156,9 +138,6 @@ Rule 7:
   Leverage: 0.163
   Composite Score: 0.245
   Temporal Validity: 0.000
-  LLM: novelty=2/10  policy_relevance=2/10
-  Why it matters: This rule indicates that a calm mobile baseline leads to grocery spikes, which is somewhat tautological as calmness typically correlates with increased mobility. The expected lead time is immediate.
-  Policy recommendation: The UAE Ministry of Economy should monitor mobility patterns. If a calm mobile baseline is observed, ensure that grocery supply chains are prepared for potential spikes.
 
 Rule 8:
   IF:   sentiment_improved, solidarity_messages
@@ -170,12 +149,9 @@ Rule 8:
   Leverage: 0.069
   Composite Score: 0.074
   Temporal Validity: 0.000
-  LLM: novelty=2/10  policy_relevance=2/10
-  Why it matters: This rule shows that improved sentiment and solidarity messages lead to high positive sentiment, which is somewhat expected. The timing aligns with general trends in sentiment during the pandemic. The expected lead time is immediate.
-  Policy recommendation: The UAE Community Development Authority should promote solidarity messages. If improved sentiment is detected, consider reinforcing community support initiatives.
 
 
-TOP PREDICTIVE (LAGGED/LEAD) RULES — 40 total after pruning:
+TOP PREDICTIVE (LAGGED/LEAD) RULES — 16 total after pruning:
 --------------------------------------------------------------------------------
 
 Predictive Rule 1:

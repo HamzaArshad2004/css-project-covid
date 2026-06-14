@@ -60,14 +60,21 @@ MOBILITY_TARGET_FEATURES: list[str] = [
     "partial_restrictions",
 ]
 
-# Social features can also be outcomes (bidirectional: mobility predicts mood)
+# Social features can also be outcomes (bidirectional: mobility predicts mood).
+# Any social signal we want to *forecast* must appear here so it gets a _lead
+# column. A feature that only lives in SOCIAL_PREDICTOR_FEATURES can never be a
+# valid predictive consequent — it would only ever produce a backward-pointing
+# _lag conclusion, which is a lookback, not a forecast.
 SOCIAL_TARGET_FEATURES: list[str] = [
     "sentiment_shift_detected",
     "sentiment_worsened",
     "sentiment_improved",
     "high_negative_sentiment",
+    "high_positive_sentiment",   # forecastable: vaccine-era optimism recovery
     "solidarity_messages",
     "compliance_discussed",
+    "vaccine_mentioned",         # forecastable: discourse can be an outcome too
+    "health_concern",            # forecastable: Phase-4 decoupling signal
 ]
 
 # Default lag/lead windows (days)

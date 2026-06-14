@@ -20,6 +20,7 @@ Output:
 import argparse
 import json
 import os
+import re
 import sys
 import textwrap
 from pathlib import Path
@@ -93,6 +94,40 @@ def _load_env() -> None:
             os.environ.setdefault(key, value)
 
 
+# ---------------------------------------------------------------------------
+# Deterministic temporal helpers
+# ---------------------------------------------------------------------------
+
+def compute_lead_time_days(premise: str, conclusion: str) -> int:
+    """Forecast horizon implied by a rule's temporal structure.
+
+    This is computed from the rule itself — never taken from the LLM, which has
+    no reliable way to read the suffix and tends to hallucinate a horizon.
+
+    - ``*_lead{n}`` consequent → +n   (forecasts n days ahead)
+    - same-day consequent with ``*_lag{n}`` antecedent → n
+      (uses an n-day-old signal to call today; actionable horizon is the
+       largest antecedent lag)
+    - otherwise → 0   (same-day rule)
+
+    Backward (``*_lag`` consequent) rules should already be pruned upstream;
+    if one is seen here we return 0 rather than inventing a horizon.
+    """
+    conclusion = str(conclusion).strip()
+    m = re.search(r"_lead(\d+)$", conclusion)
+    if m:
+        return int(m.group(1))
+    if re.search(r"_lag\d+$", conclusion):
+        return 0  # backward rule — should not occur post-pruning
+    lags = [int(x) for x in re.findall(r"_lag(\d+)", str(premise))]
+    return max(lags) if lags else 0
+
+
+def _is_backward_rule(premise: str, conclusion: str) -> bool:
+    """True if the conclusion carries a ``*_lag`` suffix (points to the past)."""
+    return bool(re.search(r"_lag\d+$", str(conclusion).strip()))
+
+
 def _feature_set(rule: pd.Series) -> frozenset[str]:
     """Return the full set of features referenced in a rule (premise + conclusion)."""
     parts = [p.strip() for p in rule["premise"].split(",")]
@@ -104,9 +139,15 @@ def tag_cross_domain(df: pd.DataFrame) -> pd.DataFrame:
     """
     Add / refresh the cross_domain flag based on whether a rule spans
     both the mobility and emotion feature domains.
+
+    Lag/lead suffixes are stripped before domain lookup so that, e.g.,
+    ``vaccine_mentioned_lead7`` is still recognised as an EMOTION feature.
     """
+    def _base(f: str) -> str:
+        return re.sub(r"_(lag|lead)\d+$", "", f.strip())
+
     def _is_cross(row: pd.Series) -> bool:
-        fs = _feature_set(row)
+        fs = {_base(f) for f in _feature_set(row)}
         return bool(fs & MOBILITY_FEATURES) and bool(fs & EMOTION_FEATURES)
 
     df = df.copy()
@@ -234,8 +275,8 @@ PREDICTIVE_SYSTEM_PROMPT = textwrap.dedent("""\
     You are an expert data scientist and public health policy advisor reviewing
     PREDICTIVE association rules mined from UAE COVID-19 crisis behavior data
     (March 2020 – December 2021). These rules use lagged or lead features —
-    meaning they describe how today's signals forecast future behaviour, or how
-    yesterday's signals explain today's outcome.
+    meaning they describe how today's (or the recent past's) signals forecast
+    future behaviour.
 
     The dataset combines daily Google Community Mobility metrics with Reddit
     sentiment signals. Rules were mined using a lagged/lead feature matrix
@@ -246,6 +287,13 @@ PREDICTIVE_SYSTEM_PROMPT = textwrap.dedent("""\
     _lag1, _lag3, _lag7  — feature was active 1/3/7 days AGO
     _lead2, _lead7       — feature will be active in 2/7 days FROM NOW
     No suffix            — feature is active TODAY
+
+    Every rule you see has already been validated to point FORWARD in time:
+    the consequent is either a *_lead* feature (a genuine future forecast) or a
+    same-day feature predicted from *_lag* antecedents (the past calling today).
+    You do NOT need to assess or report the lead time — it is computed
+    separately and deterministically from the rule structure. Focus only on
+    NOVELTY and POLICY RELEVANCE.
     ──────────────────────────────────────────────────────────────────────────
 
     ── UAE COVID-19 POLICY TIMELINE ──────────────────────────────────────────
@@ -263,15 +311,14 @@ PREDICTIVE_SYSTEM_PROMPT = textwrap.dedent("""\
     ──────────────────────────────────────────────────────────────────────────
 
     ── NOVELTY SCORING RUBRIC (1–10) ─────────────────────────────────────────
-    Focus specifically on whether the LEAD TIME encoded in the rule is useful
-    and non-obvious.
+    Focus specifically on whether the temporal relationship encoded in the rule
+    is useful and non-obvious.
 
-    10 — Cross-domain leading indicator with a specific, actionable lead time
-         (e.g., an emotion/sentiment signal today predicts a MOBILITY outcome
-         in 7 days, or vice versa).  The direction would not be obvious from
-         policy dates alone.
-     8–9 — Cross-domain with clear lead time; timing aligns with a known phase
-         transition but the cross-domain direction is non-trivial.
+    10 — Cross-domain leading indicator: an emotion/sentiment signal predicts a
+         MOBILITY outcome (or vice versa) with a horizon that would not be
+         obvious from policy dates alone.
+     8–9 — Cross-domain with a clear forward relationship; timing aligns with a
+         known phase transition but the cross-domain direction is non-trivial.
      6–7 — Within-domain but shows non-trivial temporal persistence or mean
          reversion (e.g., emotional oscillation, compliance decay).
      4–5 — Within-domain persistence that is broadly expected (sentiment tends
@@ -283,11 +330,11 @@ PREDICTIVE_SYSTEM_PROMPT = textwrap.dedent("""\
     ── POLICY RELEVANCE SCORING RUBRIC (1–10) ────────────────────────────────
     Score on WHETHER a UAE official could use this rule as an EARLY WARNING.
 
-    10 — Gives ≥ 2 days lead time, the trigger is a monitorable today-signal,
-         and the consequence is a real-world actionable outcome.
+    10 — The trigger is a monitorable today-or-past signal and the consequence
+         is a real-world actionable future outcome.
          Explicitly names a UAE body (NCEMA, DHA, MoHAP, WAM, etc.) and action.
-     8–9 — Clear lead time; action is obvious but operationalisation needs one
-         additional step.
+     8–9 — Clear forward signal; action is obvious but operationalisation needs
+         one additional step.
      6–7 — Useful monitoring signal; action requires further validation before
          deployment.
      4–5 — Same-domain persistence; gives situational awareness but no new
@@ -299,7 +346,7 @@ PREDICTIVE_SYSTEM_PROMPT = textwrap.dedent("""\
     - The consequent is a lagged version of a feature already in the antecedent
       at the same time offset (within-variable persistence artefact).
     - Both antecedent and consequent are purely within the mobility domain
-      or purely within the sentiment domain AND the lag is 1 day or less
+      or purely within the sentiment domain AND the rule is same-day or 1-day
       (too short to be actionable).
     - The consequent is covid_topic_detected or dominant_emotion_fear
       (near-constant, ~85 % of days).
@@ -322,8 +369,7 @@ PREDICTIVE_SYSTEM_PROMPT = textwrap.dedent("""\
         "rule_id": <int>,
         "novelty_score": <int 1-10>,
         "policy_score": <int 1-10>,
-        "lead_time_days": <int — the effective forecast horizon in days, based on the _lead or _lag suffix; use 0 if same-day>,
-        "reasoning": "<2-3 sentences: name the UAE phase, explain why the temporal direction is non-obvious, state what the lead time enables a decision-maker to do>",
+        "reasoning": "<2-3 sentences: name the UAE phase, explain why the temporal direction is non-obvious, state what the forecast enables a decision-maker to do>",
         "policy_recommendation": "<2 sentences: name a specific UAE agency, state the exact monitoring trigger and the recommended pre-emptive action>"
       },
       ...
@@ -337,7 +383,24 @@ def _build_candidate_block(df: pd.DataFrame) -> str:
 
     Annotates each rule with conviction and composite_score when available so
     the LLM can weight statistical quality alongside domain relevance.
+
+    Any backward-pointing rule (``*_lag`` consequent) that reaches this stage is
+    logged loudly to stderr — it should have been pruned, and feeding it to the
+    LLM would invite a hallucinated forward narrative for a backward pattern.
     """
+    backward = df[df.apply(
+        lambda r: _is_backward_rule(str(r["premise"]), str(r["conclusion"])), axis=1
+    )]
+    if not backward.empty:
+        print(
+            f"\n  *** WARNING: {len(backward)} backward-pointing rule(s) with a "
+            f"_lag consequent reached LLM candidate building. These are lookbacks, "
+            f"not forecasts, and should have been pruned. Listing up to 10: ***",
+            file=sys.stderr,
+        )
+        bcols = [c for c in ["premise", "conclusion", "confidence", "lift"] if c in backward.columns]
+        print(backward[bcols].head(10).to_string(index=False), file=sys.stderr)
+
     lines = []
     for _, row in df.iterrows():
         conviction = row.get("conviction")
@@ -374,18 +437,24 @@ def _stratified_candidates(df: pd.DataFrame, candidate_pool: int) -> pd.DataFram
     - Rules whose conclusion is a SOCIAL/EMOTION feature (mobility → emotion direction)
     - Rules whose conclusion is a MOBILITY feature (emotion → mobility direction)
 
-    Within each stratum, sort by lift descending.
+    Within each stratum, sort by lift descending. Lag/lead suffixes are stripped
+    before checking whether a conclusion is a mobility feature.
     """
+    def _base(f: str) -> str:
+        return re.sub(r"_(lag|lead)\d+$", "", str(f).strip())
+
     mob = MOBILITY_FEATURES
     half = candidate_pool // 2
 
+    conc_is_mob = df["conclusion"].apply(lambda c: _base(c) in mob)
+
     social_conclusion = (
-        df[df["cross_domain"] & ~df["conclusion"].isin(mob)]
+        df[df["cross_domain"] & ~conc_is_mob]
         .sort_values(["lift", "confidence"], ascending=False)
         .head(half)
     )
     mob_conclusion = (
-        df[df["cross_domain"] & df["conclusion"].isin(mob)]
+        df[df["cross_domain"] & conc_is_mob]
         .sort_values(["lift", "confidence"], ascending=False)
         .head(half)
     )
@@ -410,8 +479,9 @@ def select_top_rules_with_llm(
     Send the top `candidate_pool` rules to the LLM in a single batch call and
     ask it to select the `top_n` most novel and policy-relevant ones.
 
-    Returns the full df with three new columns on the selected rows:
-      novelty_score, policy_score, llm_reasoning
+    Returns the full df with new columns on the selected rows:
+      novelty_score, policy_score, llm_reasoning, llm_policy_recommendation,
+      llm_rank, lead_time_days (computed deterministically), llm_composite.
     The returned df is sorted so the LLM-selected top rules appear first (in LLM rank
     order), followed by the remaining rules.
     """
@@ -488,8 +558,10 @@ def select_top_rules_with_llm(
         df.at[idx, "llm_reasoning"] = entry.get("reasoning", "")
         df.at[idx, "llm_policy_recommendation"] = entry.get("policy_recommendation", "")
         df.at[idx, "llm_rank"] = rank
-        if "lead_time_days" in entry:
-            df.at[idx, "lead_time_days"] = entry.get("lead_time_days")
+        # Lead time is derived from the rule structure, never from the LLM.
+        df.at[idx, "lead_time_days"] = compute_lead_time_days(
+            str(df.at[idx, "premise"]), str(df.at[idx, "conclusion"])
+        )
 
     df["llm_composite"] = df[["novelty_score", "policy_score"]].mean(axis=1)
 
@@ -574,8 +646,10 @@ def _write_predictive_summary(df: pd.DataFrame, out_path: Path, top_n: int = 10)
         f.write("  LLM-EVALUATED with lead-time and policy recommendations\n")
         f.write("=" * 72 + "\n\n")
         for i, (_, rule) in enumerate(ranked.iterrows(), start=1):
-            lead = rule.get("lead_time_days")
-            lead_str = f"  Lead time: {int(lead)} days\n" if pd.notna(lead) else ""
+            # Lead time is recomputed here too, so the summary never depends on a
+            # possibly-missing column or an LLM-supplied value.
+            lead = compute_lead_time_days(str(rule["premise"]), str(rule["conclusion"]))
+            lead_str = f"  Lead time: {int(lead)} days\n" if lead else "  Lead time: same-day\n"
             f.write(f"Predictive Rule {i}:\n")
             f.write(f"  IF:   {rule['premise']}\n")
             f.write(f"  THEN: {rule['conclusion']}\n")
@@ -717,6 +791,9 @@ def main() -> None:
         print(f"{'='*60}")
         pred_df = pd.read_csv(PRED_RULES_FILE)
         print(f"Loaded {len(pred_df)} predictive rules from {PRED_RULES_FILE.name}")
+
+        # Refresh cross_domain so suffixed features resolve to their base domain
+        pred_df = tag_cross_domain(pred_df)
 
         # Score predictive rules statistically if not already done
         if "composite_score" not in pred_df.columns:

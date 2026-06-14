@@ -21,6 +21,8 @@ API:
 from __future__ import annotations
 
 import argparse
+import re
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -68,6 +70,17 @@ TAUTOLOGY_GROUPS: list[frozenset[str]] = [
         "emotion_with_mobility_signal",
         "emotion_mobility_mismatch",
     }),
+    # sentiment_shift_detected is computed as abs(delta) > 0.2, while
+    # sentiment_improved (delta > 0.2) and sentiment_worsened (delta < -0.2)
+    # are the two signed halves of that same threshold on the same variable.
+    # The shift flag is therefore logically implied by either directional flag,
+    # so any rule pairing them is definitional collinearity, not a discovery
+    # (e.g. sentiment_shift_detected → sentiment_worsened just reads off the sign).
+    frozenset({
+        "sentiment_shift_detected",
+        "sentiment_improved",
+        "sentiment_worsened",
+    }),
 ]
 
 
@@ -77,6 +90,66 @@ TAUTOLOGY_GROUPS: list[frozenset[str]] = [
 
 def _parse_premise_set(premise_str: str) -> frozenset[str]:
     return frozenset(f.strip() for f in str(premise_str).split(","))
+
+
+def _lag_level(feat: str) -> tuple[str, int]:
+    """Return the temporal kind and magnitude of a feature suffix.
+
+    ('lead', n) for ``*_leadN``  — points to the future
+    ('lag',  n) for ``*_lagN``   — points to the past
+    ('none', 0) for an unsuffixed (same-day) feature
+    """
+    m = re.search(r"_(lag|lead)(\d+)$", feat.strip())
+    return (m.group(1), int(m.group(2))) if m else ("none", 0)
+
+
+def is_backward_rule(premise: str, conclusion: str) -> bool:
+    """True if a rule's conclusion points backward (or sideways) in time.
+
+    A genuine predictive rule must forecast forward:
+      - consequent is ``*_lead``                       (forecast the future), OR
+      - consequent is same-day AND >=1 antecedent is ``*_lag``
+                                                        (use the past to call today).
+    Anything with a ``*_lag`` consequent dates the conclusion *earlier* than the
+    premise — a lookback, not a forecast — and is a backward rule.
+    Pure same-day rules (no temporal suffix anywhere) are NOT backward; they are
+    handled by the same-day filter, so this returns False for them.
+    """
+    prem_feats = [f.strip() for f in str(premise).split(",")]
+    conc_kind, _ = _lag_level(str(conclusion).strip())
+    prem_has_temporal = any(_lag_level(f)[0] != "none" for f in prem_feats)
+
+    if conc_kind == "none" and not prem_has_temporal:
+        return False                      # same-day rule — not backward
+    if conc_kind == "lead":
+        return False                      # forward forecast — valid
+    if conc_kind == "none" and prem_has_temporal:
+        return False                      # past → today — valid
+    # conc_kind == "lag"  →  conclusion is dated before the premise → backward
+    return True
+
+
+def warn_on_backward_rules(df: pd.DataFrame, context: str) -> pd.DataFrame:
+    """Loudly log any backward (``*_lag`` consequent) rules that reach a stage
+    where they should already have been pruned. Returns ``df`` unchanged so it
+    can be dropped inline into a pipeline without altering behaviour.
+    """
+    if df.empty or "premise" not in df.columns or "conclusion" not in df.columns:
+        return df
+    mask = df.apply(
+        lambda r: is_backward_rule(str(r["premise"]), str(r["conclusion"])), axis=1
+    )
+    n = int(mask.sum())
+    if n:
+        print(
+            f"\n  *** WARNING [{context}]: {n} backward-pointing rule(s) detected "
+            f"with a _lag consequent. These are lookbacks, not forecasts, and "
+            f"should have been pruned upstream. Listing up to 10: ***",
+            file=sys.stderr,
+        )
+        cols = [c for c in ["premise", "conclusion", "confidence", "lift"] if c in df.columns]
+        print(df.loc[mask, cols].head(10).to_string(index=False), file=sys.stderr)
+    return df
 
 
 def compute_conviction(confidence_pct: float, p_consequent: float) -> float:
@@ -170,59 +243,36 @@ def tag_obviousness(
 
 
 # ---------------------------------------------------------------------------
-# Step 2a — Same-lag artefact filter
+# Step 2a — Backward-rule filter (lookbacks masquerading as predictions)
 # ---------------------------------------------------------------------------
 
 def remove_same_lag_artefacts(df: pd.DataFrame) -> pd.DataFrame:
-    """Remove rules where every antecedent feature and the consequent share the
-    same lag/lead suffix, making the rule equivalent to a same-day rule just
-    shifted in time (e.g. A_lag1, B_lag1 → C_lag1 is NOT a genuine prediction).
+    """Remove rules whose conclusion points backward or sideways in time.
 
-    A genuine predictive rule must either:
-    - Have a *_lead* consequent (forecasting the future), or
-    - Have a current-day (no suffix) consequent with at least one lagged antecedent
+    A genuine predictive rule must forecast the future:
+    - consequent is ``*_lead``  (forecasting forward), OR
+    - consequent is same-day AND at least one antecedent is ``*_lag``
       (using the past to predict today).
 
-    Rules with no temporal suffixes at all (same-day rules) are left untouched.
+    Any rule with a ``*_lag`` consequent is a lookback, not a forecast — the
+    conclusion is dated earlier than the premise — and is removed regardless of
+    the antecedent lags. (The previous version only removed such a rule when
+    *every* antecedent shared the *same* lag as the consequent, which let rules
+    like ``grocery_spike, lockdown_mentioned → vaccine_mentioned_lag7`` survive
+    with same-day antecedents and a backward conclusion.)
+
+    Pure same-day rules (no temporal suffix anywhere) are left untouched.
     """
-    import re
 
-    def _lag_level(feat: str):
-        m = re.search(r"_(lag|lead)(\d+)$", feat)
-        return (m.group(1), int(m.group(2))) if m else ("none", 0)
+    def _is_artefact(row) -> bool:
+        return is_backward_rule(str(row["premise"]), str(row["conclusion"]))
 
-    def _is_same_lag_artefact(row) -> bool:
-        prem_feats = [f.strip() for f in str(row["premise"]).split(",")]
-        conc = str(row["conclusion"]).strip()
-        conc_kind, conc_n = _lag_level(conc)
-
-        # Same-day rules — no temporal suffix anywhere; keep them
-        prem_has_temporal = any(_lag_level(f)[0] != "none" for f in prem_feats)
-        if conc_kind == "none" and not prem_has_temporal:
-            return False
-
-        # Valid: consequent is _lead (genuine future forecast)
-        if conc_kind == "lead":
-            return False
-
-        # Valid: consequent is current-day AND at least one antecedent is lagged
-        if conc_kind == "none" and prem_has_temporal:
-            return False
-
-        # Artefact: consequent is _lag and ALL antecedents share the same lag number
-        if conc_kind == "lag":
-            prem_lag_ns = [_lag_level(f)[1] for f in prem_feats if _lag_level(f)[0] == "lag"]
-            if prem_lag_ns and all(n == conc_n for n in prem_lag_ns):
-                return True
-
-        return False
-
-    artefact_mask = df.apply(_is_same_lag_artefact, axis=1)
+    artefact_mask = df.apply(_is_artefact, axis=1)
     before = len(df)
     df = df[~artefact_mask].copy().reset_index(drop=True)
     removed = before - len(df)
     if removed:
-        print(f"  Same-lag filter : {before} → {len(df)} rules  ({removed} same-lag artefacts removed)")
+        print(f"  Backward filter : {before} → {len(df)} rules  ({removed} lookback/same-lag artefacts removed)")
     return df
 
 
@@ -253,6 +303,45 @@ def remove_leaky_predictive_rules(df: pd.DataFrame) -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# Step 2b2 — Within-variable persistence filter
+# ---------------------------------------------------------------------------
+
+def remove_within_variable_persistence(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove rules where the consequent's BASE feature also appears (at any
+    lag/lead) in the antecedent.
+
+    Example artefacts this catches that string-equality checks miss:
+        grocery_spike                     -> grocery_spike_lead7
+        vaccine_mentioned_lag1            -> vaccine_mentioned
+        sentiment_improved, high_positive_sentiment_lag7 -> high_positive_sentiment
+
+    These describe a single variable's autocorrelation across time (the value
+    persists), not a relationship between distinct phenomena. The forecast adds
+    no information beyond "this state tends to last." Any *other* antecedent
+    feature in such a rule is typically doing no work — confidence is already
+    driven by the self-overlap (note the 100%-confidence cases).
+
+    A rule survives only if the consequent's base feature is entirely absent
+    from the antecedent's base features.
+    """
+    def _base(f: str) -> str:
+        return re.sub(r"_(lag|lead)\d+$", "", f.strip())
+
+    def _is_persistence(row) -> bool:
+        prem_bases = {_base(f) for f in str(row["premise"]).split(",")}
+        conc_base = _base(str(row["conclusion"]))
+        return conc_base in prem_bases
+
+    mask = df.apply(_is_persistence, axis=1)
+    before = len(df)
+    df = df[~mask].copy().reset_index(drop=True)
+    removed = before - len(df)
+    if removed:
+        print(f"  Persistence flt : {before} → {len(df)} rules  ({removed} within-variable persistence artefacts removed)")
+    return df
+
+
+# ---------------------------------------------------------------------------
 # Step 2c — Tautology filter (definitionally collinear features)
 # ---------------------------------------------------------------------------
 
@@ -267,14 +356,13 @@ def remove_tautological_rules(
     if tautology_groups is None:
         tautology_groups = TAUTOLOGY_GROUPS
 
+    def _base(f: str) -> str:
+        return re.sub(r"_(lag|lead)\d+$", "", f.strip())
+
     tautological: list[bool] = []
     for _, row in df.iterrows():
         premise_feats = _parse_premise_set(str(row["premise"]))
         conclusion_feat = str(row["conclusion"]).strip()
-        # Strip lag/lead suffixes to check the base feature name
-        def _base(f: str) -> str:
-            import re
-            return re.sub(r"_(lag|lead)\d+$", "", f)
         base_premise = {_base(f) for f in premise_feats}
         base_conclusion = _base(conclusion_feat)
         is_tautological = any(
@@ -439,7 +527,7 @@ def prune_rules(
         print("  WARNING: No rules survived hard filters.")
         return df
 
-    # 2a. Same-lag artefact filter (e.g. A_lag1, B_lag1 → C_lag1 is not a prediction)
+    # 2a. Backward-rule filter: any _lag consequent is a lookback, not a forecast
     df = remove_same_lag_artefacts(df)
     if df.empty:
         return df
@@ -447,8 +535,8 @@ def prune_rules(
     # 2a2. Pure same-day filter: if the df contains ANY temporal feature, remove
     # rules that have no temporal suffix anywhere — they duplicate same-day analysis.
     has_temporal_col = (
-        df["premise"].str.contains(r"_(lag|lead)\d+", regex=True)
-        | df["conclusion"].str.contains(r"_(lag|lead)\d+", regex=True)
+        df["premise"].str.contains(r"_(?:lag|lead)\d+", regex=True)
+        | df["conclusion"].str.contains(r"_(?:lag|lead)\d+", regex=True)
     )
     if has_temporal_col.any():
         before = len(df)
@@ -461,6 +549,11 @@ def prune_rules(
 
     # 2b. Data-leakage filter (removes _lead features from antecedents)
     df = remove_leaky_predictive_rules(df)
+    if df.empty:
+        return df
+
+    # 2b2. Within-variable persistence filter (e.g. grocery_spike → grocery_spike_lead7)
+    df = remove_within_variable_persistence(df)
     if df.empty:
         return df
 
@@ -480,6 +573,9 @@ def prune_rules(
 
     # 5. Per-consequent cap
     df = cap_per_consequent(df, max_rules=max_rules_per_consequent)
+
+    # Final safety net: nothing backward should remain. Log loudly if it does.
+    df = warn_on_backward_rules(df, context="prune_rules:final")
 
     print(f"  After pruning   : {len(df)} rules remain")
     return df.reset_index(drop=True)

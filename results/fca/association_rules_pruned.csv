@@ -1,5 +1,4 @@
 premise,conclusion,support,support_pct,confidence,lift,leverage,cross_domain,conviction,obviousness_penalty
-"high_positive_sentiment, sentiment_shift_detected",sentiment_improved,179,26.67660208643815,82.68156424581005,2.746501465789037,0.1402582172658643,False,4.035911735012737,0.2
 "grocery_spike, weekend",calm_mobile_baseline,82,12.220566318926975,87.8048780487805,2.214927562809463,0.0588573674987395,False,4.9493293591654295,0.2
 "grocery_spike, high_positive_sentiment",calm_mobile_baseline,103,15.350223546944855,85.43689320388349,2.155193809767136,0.0702956860881172,True,4.144560357675111,0.0
 "sentiment_improved, solidarity_messages",high_positive_sentiment,114,16.98956780923994,78.94736842105263,2.053243574051407,0.0688031520896586,False,2.923621460506707,0.2
